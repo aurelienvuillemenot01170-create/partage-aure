@@ -120,7 +120,8 @@
   #btnScan:active{
     transform:translateY(4px); box-shadow:0 2px 0 var(--brand-dark), 0 4px 10px rgba(20,92,87,.3);
   }
-  #hiddenScanInput{position:absolute;opacity:0;pointer-events:none;height:0;width:0;}
+  /* Le scan Zebra est capturé au niveau du document : aucun champ caché à focus, donc aucun clavier logiciel. */
+  #hiddenScanInput{display:none;}
 
   /* ---------- Camera modal ---------- */
   .cam-modal{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:80;}
@@ -191,7 +192,6 @@
   <div class="scan-zone">
     <div id="scanStatus">Douchette toujours active — SCAN ouvre la caméra</div>
     <button id="btnScan">◉ SCAN</button>
-    <input type="text" id="hiddenScanInput" inputmode="numeric" autocomplete="off">
   </div>
 
   <div class="cam-modal" id="camModal">
@@ -511,7 +511,7 @@ function startFieldEdit(spanEl){
     isEditingField = false;
     updateInventaireCounter();
     renderTable();
-    ensureScanFocus();
+    // Après validation, aucun focus forcé : le clavier reste fermé.
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e)=>{
@@ -633,28 +633,44 @@ function onScanValue(ean){
   if(navigator.vibrate) navigator.vibrate(40);
 }
 
-/* ---------- Capture clavier (douchette Zebra, sans touche Entrée) — toujours active ---------- */
-const hiddenInput = document.getElementById('hiddenScanInput');
-function shouldHoldScanFocus(){
-  return !isEditingField && !document.getElementById('settingsModal').classList.contains('show');
+/* ---------- Capture clavier (douchette Zebra, sans touche Entrée) ----------
+   IMPORTANT : on ne donne plus le focus à un champ caché. Cela empêchait le
+   clavier logiciel de s'ouvrir, mais provoquait justement son apparition au
+   moindre clic sur l'écran. La douchette est maintenant capturée directement
+   au niveau du document. Le scanner Zebra peut donc continuer à envoyer ses
+   chiffres comme des frappes clavier, sans focus particulier. */
+let scanBuffer = '';
+let scanTimer = null;
+
+function resetScanBuffer(){
+  scanBuffer = '';
+  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
 }
-function ensureScanFocus(){
-  if(shouldHoldScanFocus() && document.activeElement !== hiddenInput){
-    hiddenInput.focus({preventScroll:true});
-  }
-}
-hiddenInput.addEventListener('input', ()=>{
-  const v = hiddenInput.value.replace(/\D/g,'');
-  if(v.length >= 13){
-    onScanValue(v.slice(0,13));
-    hiddenInput.value = '';
+
+document.addEventListener('keydown', (e)=>{
+  // Pendant l'édition d'un champ ou dans les paramètres, les frappes
+  // doivent rester destinées au champ concerné.
+  if(isEditingField || document.getElementById('settingsModal').classList.contains('show')) return;
+
+  // Ne pas intercepter les séquences tapées manuellement dans un éventuel
+  // champ texte/select. La douchette, elle, envoie uniquement des chiffres.
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if(tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+  if(/^\d$/.test(e.key)){
+    e.preventDefault();
+    scanBuffer += e.key;
+
+    if(scanTimer) clearTimeout(scanTimer);
+    scanTimer = setTimeout(resetScanBuffer, 500);
+
+    if(scanBuffer.length >= 13){
+      const ean = scanBuffer.slice(0,13);
+      resetScanBuffer();
+      onScanValue(ean);
+    }
   }
 });
-// La douchette Zebra fonctionne en continu, indépendamment de la caméra ou de l'édition en cours :
-// on reprend le focus dès qu'il se perd (sauf pendant une édition de champ ou les paramètres).
-document.addEventListener('click', ()=> setTimeout(ensureScanFocus, 30));
-hiddenInput.addEventListener('blur', ()=> setTimeout(ensureScanFocus, 30));
-setInterval(ensureScanFocus, 1000);
 
 /* ---------- Caméra (iPhone et terminaux avec appareil photo) ---------- */
 let html5QrCode = null;
