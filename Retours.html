@@ -1,1 +1,742 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>Retours — Terrain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#16232B;
+    --ink-soft:#4B5B62;
+    --paper:#EEF2F1;
+    --surface:#FFFFFF;
+    --line:#D9E1DE;
+    --brand:#145C57;
+    --brand-dark:#0E403C;
+    --amber:#D98E2B;
+    --amber-dark:#A6690F;
+    --success:#3C8A5C;
+    --success-dark:#2C6B45;
+    --danger:#B23A2E;
+    --danger-dark:#8C2C22;
+    --inv-green:#DCEEE3;
+    --inv-pink:#F8E1DE;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+  body{
+    background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;
+    display:flex;flex-direction:column;height:100dvh;
+  }
+  h1,.display{font-family:'Space Grotesk',sans-serif;}
 
+  /* ---------- App bar ---------- */
+  .appbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;background:var(--brand);color:#fff;flex:0 0 auto;
+    padding-top:max(12px, env(safe-area-inset-top));
+  }
+  .appbar h1{font-size:1rem;margin:0;font-weight:600;}
+  .gear-btn{
+    width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.08);color:#fff;font-size:1rem;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---------- Actions RAZ / Envoyer ---------- */
+  .actionbar{display:flex;gap:8px;padding:10px 14px 4px;flex:0 0 auto;}
+  .action-btn{
+    flex:1;border:none;border-radius:10px;padding:9px 8px;font-family:'Space Grotesk',sans-serif;
+    font-weight:700;font-size:.85rem;color:#fff;letter-spacing:.1px;
+    transition:transform .08s, box-shadow .1s;
+  }
+  .action-btn:active{transform:translateY(2px) scale(.98);}
+  .btn-raz{background:var(--danger);box-shadow:0 3px 0 var(--danger-dark);}
+  .btn-raz:active{box-shadow:0 1px 0 var(--danger-dark);}
+  .btn-envoyer{background:var(--success);box-shadow:0 3px 0 var(--success-dark);}
+  .btn-envoyer:active{box-shadow:0 1px 0 var(--success-dark);}
+
+  /* ---------- Bandeau inventaire ---------- */
+  .inv-banner{
+    margin:6px 14px 0;border-radius:12px;background:var(--amber);color:#3A2705;
+    padding:10px 14px;flex:0 0 auto;transition:padding .2s;
+  }
+  .inv-row1{display:flex;align-items:center;gap:10px;font-weight:600;font-size:.92rem;}
+  .inv-row1 input{width:19px;height:19px;}
+  .inv-details{display:none;margin-top:10px;gap:10px;flex-wrap:wrap;align-items:center;}
+  .inv-banner.expanded .inv-details{display:flex;}
+  .inv-field{display:flex;align-items:center;gap:8px;font-size:.85rem;flex:1 1 44%;min-width:150px;}
+  .inv-field label{font-weight:600;white-space:nowrap;}
+  .inv-field select{flex:1;padding:7px 8px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-size:.85rem;min-width:0;}
+  .inv-counter{
+    flex:1 1 100%;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.95rem;
+    background:rgba(255,255,255,.55);border-radius:8px;padding:6px 10px;text-align:center;
+  }
+
+  /* ---------- Table résultats ---------- */
+  .table-scroll{flex:1 1 auto;overflow-y:auto;padding:10px 14px 4px;-webkit-overflow-scrolling:touch;}
+  .rowcard{
+    background:var(--surface);border-radius:10px;padding:10px 12px;margin-bottom:8px;
+    border:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:4px 10px;
+    font-size:.85rem;position:relative;
+  }
+  .rowcard.inv-match{background:var(--inv-green);border-color:#B6DAC5;}
+  .rowcard.inv-mismatch{background:var(--inv-pink);border-color:#EAC0BA;}
+  .rowcard.flash{animation:flashRow 1.4s ease;}
+  @keyframes flashRow{
+    0%{box-shadow:0 0 0 3px var(--amber);}
+    100%{box-shadow:0 0 0 0 rgba(217,142,43,0);}
+  }
+  .rc-titre{grid-column:1/3;font-weight:600;color:var(--ink);font-size:.88rem;}
+  .rc-meta{color:var(--ink-soft);font-size:.78rem;grid-column:1/3;display:flex;gap:12px;flex-wrap:wrap;}
+  .rc-editfields{grid-column:1/3;display:flex;gap:10px;margin-top:4px;}
+  .rc-editfields .ef{flex:1;}
+  .rc-editfields label{display:block;font-size:.68rem;color:var(--ink-soft);margin-bottom:2px;}
+  .ef-value{
+    display:block;width:100%;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-size:.85rem;
+    font-family:'IBM Plex Mono',monospace;background:#F5F8F7;color:var(--ink);
+  }
+  .ef-value.modified{color:var(--danger);font-weight:600;}
+  .rc-editfields input{
+    width:100%;border:1px solid var(--brand);border-radius:7px;padding:6px 8px;font-size:.85rem;
+    font-family:'IBM Plex Mono',monospace;background:#fff;
+  }
+  .empty-state{text-align:center;color:var(--ink-soft);padding:40px 20px;font-size:.9rem;}
+
+  /* ---------- Bouton SCAN ---------- */
+  .scan-zone{flex:0 0 auto;padding:10px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg, rgba(238,242,241,0), var(--paper) 30%);}
+  #scanStatus{text-align:center;font-size:.78rem;color:var(--ink-soft);margin-bottom:6px;min-height:14px;}
+  #btnScan{
+    width:100%;padding:20px;border:none;border-radius:16px;
+    background:radial-gradient(circle at 30% 20%, #1C7A72, var(--brand) 70%);
+    color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.2rem;letter-spacing:.5px;
+    box-shadow:0 6px 0 var(--brand-dark), 0 10px 22px rgba(20,92,87,.35);
+    transition:transform .07s, box-shadow .1s;
+  }
+  #btnScan:active{
+    transform:translateY(4px); box-shadow:0 2px 0 var(--brand-dark), 0 4px 10px rgba(20,92,87,.3);
+  }
+  /* Le scan Zebra est capturé au niveau du document : aucun champ caché à focus, donc aucun clavier logiciel. */
+  #hiddenScanInput{display:none;}
+
+  /* ---------- Camera modal ---------- */
+  .cam-modal{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:80;}
+  .cam-modal.show{display:flex;}
+  #camReader{flex:1;}
+  .cam-close{
+    position:absolute;top:max(14px, env(safe-area-inset-top));right:14px;z-index:81;
+    background:rgba(255,255,255,.9);border:none;border-radius:50%;width:38px;height:38px;font-size:1.1rem;
+  }
+  .cam-hint{position:absolute;bottom:max(20px, env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;font-size:.85rem;}
+
+  /* ---------- Toast / modal ---------- */
+  #toast{
+    position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:.85rem;
+    opacity:0;pointer-events:none;transition:all .25s ease;z-index:100;max-width:88vw;text-align:center;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.ok{background:var(--success);}
+  #toast.err{background:var(--danger);}
+
+  .modal-back{position:fixed;inset:0;background:rgba(20,30,28,.45);display:none;align-items:center;justify-content:center;z-index:90;}
+  .modal-back.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;padding:22px;width:min(340px,86vw);box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal p{font-size:.9rem;color:var(--ink-soft);}
+  .modal input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:.88rem;margin-top:6px;}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+  .modal .actions button{border:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:.85rem;}
+  .btn-cancel{background:var(--paper);color:var(--ink);}
+  .btn-confirm{background:var(--danger);color:#fff;}
+  .btn-confirm.ok{background:var(--success);}
+</style>
+</head>
+<body>
+
+  <div class="appbar">
+    <h1>Retours — Terrain</h1>
+    <button class="gear-btn" id="btnSettings">⚙</button>
+  </div>
+
+  <div class="actionbar">
+    <button class="action-btn btn-raz" id="btnRaz">R.A.Z.</button>
+    <button class="action-btn btn-envoyer" id="btnEnvoyer">Envoyer</button>
+  </div>
+
+  <div class="inv-banner" id="invBanner">
+    <div class="inv-row1">
+      <input type="checkbox" id="chkInventaire">
+      <label for="chkInventaire">Mode inventaire</label>
+    </div>
+    <div class="inv-details">
+      <div class="inv-field">
+        <label>Magasin :</label>
+        <select id="selMagasin"></select>
+      </div>
+      <div class="inv-field">
+        <label>Emplacement :</label>
+        <select id="selEmplacement"></select>
+      </div>
+      <div class="inv-counter" id="invCounter">Titres inventoriés : 0/0</div>
+    </div>
+  </div>
+
+  <div class="table-scroll" id="tableScroll">
+    <div class="empty-state" id="emptyState">Aucune ligne scannée pour l'instant.<br>Appuyez sur SCAN pour commencer.</div>
+  </div>
+
+  <div class="scan-zone">
+    <div id="scanStatus">Douchette toujours active — SCAN ouvre la caméra</div>
+    <button id="btnScan">◉ SCAN</button>
+  </div>
+
+  <div class="cam-modal" id="camModal">
+    <button class="cam-close" id="btnCamClose">✕</button>
+    <div id="camReader"></div>
+    <div class="cam-hint">Visez le code-barres EAN13 de l'article</div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="modal-back" id="confirmModal">
+    <div class="modal">
+      <h3 id="confirmTitle" style="margin-top:0;"></h3>
+      <p id="confirmText"></p>
+      <div class="actions">
+        <button class="btn-cancel" id="confirmCancel">Annuler</button>
+        <button class="btn-confirm" id="confirmOk">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="settingsModal">
+    <div class="modal">
+      <h3 style="margin-top:0;">Connexion GitHub</h3>
+      <p>Jeton d'accès personnel (scope <code>gist</code>), nécessaire pour envoyer les modifications.</p>
+      <input type="password" id="inputToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <div class="actions">
+        <button class="btn-cancel" id="btnCloseSettings">Fermer</button>
+        <button class="btn-confirm ok" id="btnSaveToken">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ======================================================================
+   CONFIGURATION
+   ====================================================================== */
+const GIST_DATA_ID  = 'b9a88af354ce71fc0f6bdb304203c650';   // retours.json
+const GIST_MODIF_ID = '34b4d14fff9969bd8c730b70d819168b';   // retours-modifications.json
+const LS_TOKEN     = 'retours_gh_token';
+const LS_FN_DATA   = 'retours_gist_data_filename';
+const LS_FN_MOD    = 'retours_gist_modif_filename';
+const LS_LOCAL_MOD = 'retours_local_modifications';
+const LS_DATA_CACHE= 'retours_local_data_cache';
+const DEFAULT_DEV_TOKEN = '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'; // jeton de développement, à remplacer avant mise en production
+if(!localStorage.getItem(LS_TOKEN)) localStorage.setItem(LS_TOKEN, DEFAULT_DEV_TOKEN);
+
+let dataTable = [];        // référentiel article (lecture seule, depuis retours.json)
+let modifications = [];    // table de travail locale (source de vérité tant que non envoyée)
+let invMode = false;
+
+/* ======================================================================
+   UTILITAIRES
+   ====================================================================== */
+function toast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (kind ? ' '+kind : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.className='', 3000);
+}
+function safeParseArray(content){
+  if(!content) return [];
+  let parsed;
+  try{ parsed = JSON.parse(content); }
+  catch(e){ return []; }
+  if(Array.isArray(parsed)) return parsed;
+  if(parsed && typeof parsed === 'object') return Object.values(parsed);
+  return [];
+}
+function saveLocalModifications(){
+  localStorage.setItem(LS_LOCAL_MOD, JSON.stringify(modifications));
+}
+function loadLocalModifications(){
+  modifications = safeParseArray(localStorage.getItem(LS_LOCAL_MOD));
+}
+function askConfirm(title, text, opts={}){
+  return new Promise(resolve=>{
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').textContent = text;
+    const modal = document.getElementById('confirmModal');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+    cancelBtn.style.display = opts.alertOnly ? 'none' : '';
+    okBtn.textContent = opts.alertOnly ? 'OK' : 'Confirmer';
+    modal.classList.add('show');
+    const cleanup = (val)=>{
+      modal.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(val);
+    };
+    const onOk = ()=>cleanup(true);
+    const onCancel = ()=>cleanup(false);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+function showAlert(title, text){ return askConfirm(title, text, {alertOnly:true}); }
+
+/* ---------- Retour sonore ---------- */
+function beep(freq, duration, type){
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration/1000);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration/1000);
+    osc.onended = ()=> ctx.close();
+  }catch(e){ /* audio indisponible, on ignore silencieusement */ }
+}
+function beepSuccess(){ beep(1568, 110, 'sine'); }
+function beepUnknown(){ beep(280, 260, 'square'); }
+
+/* ======================================================================
+   API GITHUB GIST
+   ====================================================================== */
+function ghHeaders(needAuth){
+  const h = {'Accept':'application/vnd.github+json'};
+  const token = localStorage.getItem(LS_TOKEN);
+  if(needAuth && token) h['Authorization'] = 'token '+token;
+  return h;
+}
+async function ghReadFirstFile(gistId){
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {headers: ghHeaders(false)});
+  if(!res.ok) throw new Error('Lecture GIST impossible ('+res.status+')');
+  const gist = await res.json();
+  const filenames = Object.keys(gist.files || {});
+  if(filenames.length === 0) throw new Error('GIST vide');
+  const filename = filenames[0];
+  let content = gist.files[filename].content;
+  if(gist.files[filename].truncated){
+    const raw = await fetch(gist.files[filename].raw_url);
+    content = await raw.text();
+  }
+  return {filename, content};
+}
+async function ghPatchFile(gistId, filename, content){
+  const token = localStorage.getItem(LS_TOKEN);
+  if(!token) throw new Error('Aucun jeton GitHub enregistré (⚙)');
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+    method:'PATCH',
+    headers:{...ghHeaders(true),'Content-Type':'application/json'},
+    body: JSON.stringify({files:{[filename]:{content}}})
+  });
+  if(!res.ok){
+    const body = await res.text();
+    throw new Error('Échec ('+res.status+') '+body.slice(0,140));
+  }
+  return res.json();
+}
+
+/* ======================================================================
+   CHARGEMENT REFERENTIEL ARTICLE
+   ====================================================================== */
+async function loadDataTable(){
+  try{
+    const {filename, content} = await ghReadFirstFile(GIST_DATA_ID);
+    localStorage.setItem(LS_FN_DATA, filename);
+    dataTable = safeParseArray(content);
+    localStorage.setItem(LS_DATA_CACHE, JSON.stringify(dataTable));
+    toast('Référentiel article synchronisé ('+dataTable.length+' lignes)','ok');
+  }catch(e){
+    dataTable = safeParseArray(localStorage.getItem(LS_DATA_CACHE));
+    toast('Hors-ligne : référentiel local utilisé ('+dataTable.length+' lignes)','err');
+  }
+  populateInventaireSelects();
+  updateInventaireCounter();
+}
+
+/* ======================================================================
+   MODE INVENTAIRE
+   ====================================================================== */
+function populateInventaireSelects(){
+  const magasins = [...new Set(dataTable.map(r=>r.magasin))].filter(Boolean).sort();
+  const selM = document.getElementById('selMagasin');
+  const prevM = selM.value;
+  selM.innerHTML = magasins.map(m=>`<option value="${m}">${m}</option>`).join('');
+  if(magasins.includes(prevM)) selM.value = prevM;
+  updateEmplacementOptions();
+}
+function updateEmplacementOptions(){
+  const selM = document.getElementById('selMagasin');
+  const selE = document.getElementById('selEmplacement');
+  const prevE = selE.value;
+  const emplacements = [...new Set(dataTable.filter(r=>r.magasin===selM.value).map(r=>r.emplace ?? ''))].sort((a,b)=>a.localeCompare(b,'fr',{numeric:true}));
+  selE.innerHTML = emplacements.map(e=>`<option value="${e}">${e === '' ? '--Vide--' : e}</option>`).join('');
+  if(emplacements.includes(prevE)) selE.value = prevE;
+}
+document.getElementById('selMagasin').addEventListener('change', ()=>{ updateEmplacementOptions(); updateInventaireCounter(); renderTable(); });
+document.getElementById('selEmplacement').addEventListener('change', ()=>{ updateInventaireCounter(); renderTable(); });
+
+document.getElementById('chkInventaire').addEventListener('change', (e)=>{
+  invMode = e.target.checked;
+  document.getElementById('invBanner').classList.toggle('expanded', invMode);
+  updateInventaireCounter();
+  renderTable();
+});
+
+function updateInventaireCounter(){
+  if(!invMode) return;
+  const m = document.getElementById('selMagasin').value;
+  const e = document.getElementById('selEmplacement').value;
+  const total = dataTable.filter(r=>r.magasin===m && r.emplace===e).length;
+  const x = modifications.filter(r=>r.magasin===m && r.emplacement===e).length;
+  document.getElementById('invCounter').textContent = `Titres inventoriés : ${x}/${total}`;
+}
+
+/* ======================================================================
+   TABLE DE TRAVAIL (MODIFICATIONS)
+   ====================================================================== */
+let flashIndex = null; // index (dans modifications) à mettre en évidence au prochain rendu
+
+function renderTable(){
+  const scroll = document.getElementById('tableScroll');
+  scroll.innerHTML = '';
+  if(modifications.length===0){
+    scroll.innerHTML = '<div class="empty-state" id="emptyState">Aucune ligne scannée pour l\'instant.<br>Appuyez sur SCAN pour commencer.</div>';
+    return;
+  }
+  const selM = document.getElementById('selMagasin').value;
+  const selE = document.getElementById('selEmplacement').value;
+
+  // affichage du plus récent en haut
+  for(let i = modifications.length - 1; i >= 0; i--){
+    const r = modifications[i];
+    const card = document.createElement('div');
+    card.className = 'rowcard';
+    if(invMode){
+      card.classList.add(r.magasin===selM && r.emplacement===selE ? 'inv-match' : 'inv-mismatch');
+    }
+    card.dataset.index = i;
+
+    const empModified = r.nouvelEmplacement !== '' && r.nouvelEmplacement !== r.emplacement;
+    const empValue = empModified ? r.nouvelEmplacement : r.emplacement;
+    const empDisplay = empValue === '' ? '--Vide--' : empValue;
+
+    const stockEqual = r.nouveauStock === '' || Number(r.nouveauStock) === Number(r.stock);
+    const stockDisplay = stockEqual ? String(r.stock) : `${r.nouveauStock}/${r.stock}`;
+
+    card.innerHTML = `
+      <div class="rc-titre" data-role="titre">${r.titre || '(sans titre)'}</div>
+      <div class="rc-meta">
+        <span>Art. ${r.article}</span>
+        <span>EAN ${r.ean13}</span>
+        <span>Mag. ${r.magasin}</span>
+      </div>
+      <div class="rc-editfields">
+        <div class="ef">
+          <label>Emplacement</label>
+          <span class="ef-value ${empModified?'modified':''}" data-field="emplacement">${empDisplay}</span>
+        </div>
+        <div class="ef">
+          <label>Stock</label>
+          <span class="ef-value ${stockEqual?'':'modified'}" data-field="stock">${stockDisplay}</span>
+        </div>
+      </div>
+    `;
+    scroll.appendChild(card);
+  }
+
+  // double-clic sur le titre = suppression
+  scroll.querySelectorAll('[data-role="titre"]').forEach(el=>{
+    el.addEventListener('dblclick', ()=> confirmDeleteRow(Number(el.closest('.rowcard').dataset.index)));
+  });
+
+  // double-clic sur un champ = édition (simple clic = aucune action, pour éviter le clavier intempestif)
+  scroll.querySelectorAll('.ef-value').forEach(el=>{
+    el.addEventListener('dblclick', ()=> startFieldEdit(el));
+  });
+
+  // mise en évidence + défilement vers la ligne concernée par un re-scan
+  if(flashIndex !== null){
+    const card = scroll.querySelector(`.rowcard[data-index="${flashIndex}"]`);
+    if(card){
+      card.scrollIntoView({behavior:'smooth', block:'center'});
+      card.classList.add('flash');
+      setTimeout(()=> card.classList.remove('flash'), 1400);
+    }
+    flashIndex = null;
+  }
+}
+
+let isEditingField = false;
+function startFieldEdit(spanEl){
+  const card = spanEl.closest('.rowcard');
+  const idx = Number(card.dataset.index);
+  const row = modifications[idx];
+  const field = spanEl.dataset.field;
+  const currentValue = field === 'emplacement'
+    ? (row.nouvelEmplacement !== '' ? row.nouvelEmplacement : row.emplacement)
+    : (row.nouveauStock !== '' ? row.nouveauStock : row.stock);
+
+  isEditingField = true;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentValue;
+  if(field === 'stock') input.inputMode = 'numeric';
+  spanEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = ()=>{
+    const val = input.value.trim();
+    if(field === 'emplacement'){
+      row.nouvelEmplacement = (val !== row.emplacement) ? val : '';
+    } else {
+      row.nouveauStock = (val !== '' && Number(val) !== Number(row.stock)) ? val : '';
+    }
+    saveLocalModifications();
+    isEditingField = false;
+    updateInventaireCounter();
+    renderTable();
+    // Après validation, aucun focus forcé : le clavier reste fermé.
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ input.blur(); }
+  });
+}
+
+async function confirmDeleteRow(idx){
+  const row = modifications[idx];
+  const ok = await askConfirm('Supprimer la ligne ?', `Article ${row.article} — ${row.titre}`);
+  if(ok){
+    modifications.splice(idx,1);
+    saveLocalModifications();
+    updateInventaireCounter();
+    renderTable();
+  }
+  ensureScanFocus();
+}
+
+/* ======================================================================
+   R.A.Z. / ENVOYER
+   ====================================================================== */
+document.getElementById('btnRaz').addEventListener('click', async ()=>{
+  if(modifications.length===0){ toast('La liste est déjà vide'); return; }
+  const ok = await askConfirm('Remise à zéro', 'Toutes les lignes scannées localement seront supprimées. Cette action est irréversible.');
+  if(ok){
+    modifications = [];
+    saveLocalModifications();
+    updateInventaireCounter();
+    renderTable();
+    toast('Liste locale remise à zéro','ok');
+  }
+});
+
+document.getElementById('btnEnvoyer').addEventListener('click', async ()=>{
+  if(modifications.length===0){ toast('Rien à envoyer'); return; }
+  const ok = await askConfirm('Envoyer vers le GIST', `${modifications.length} ligne(s) vont être envoyées vers « retours-modifications.json ».`);
+  if(!ok) return;
+  try{
+    toast('Envoi en cours…');
+    let filename = localStorage.getItem(LS_FN_MOD);
+    let remote = [];
+    try{
+      const first = await ghReadFirstFile(GIST_MODIF_ID);
+      filename = first.filename;
+      remote = safeParseArray(first.content);
+    }catch(e){ /* le fichier distant sera créé/écrasé avec les données locales */ }
+    const keyOf = r => `${r.article}||${r.magasin}||${r.emplacement}||${r.ean13}||${r.nouvelEmplacement}||${r.nouveauStock}`;
+    const map = new Map(remote.map(r=>[keyOf(r), r]));
+    for(const r of modifications) map.set(keyOf(r), r);
+    const merged = Array.from(map.values());
+    await ghPatchFile(GIST_MODIF_ID, filename || 'retours-modifications.json', JSON.stringify(merged));
+    modifications = [];
+    saveLocalModifications();
+    updateInventaireCounter();
+    renderTable();
+    toast('Envoi réussi ('+merged.length+' lignes au total)','ok');
+  }catch(e){
+    toast(e.message,'err');
+  }
+});
+
+/* ======================================================================
+   TRAITEMENT D'UN SCAN
+   ====================================================================== */
+function onScanValue(ean){
+  ean = String(ean).replace(/\D/g,'');
+  if(ean.length < 8){ return; }
+
+  // on ferme immédiatement la fenêtre caméra dès qu'un code est détecté
+  if(html5QrCode) stopCamera();
+
+  let candidates = dataTable.filter(r => r.ean13 === ean);
+  if(candidates.length === 0){
+    beepUnknown();
+    if(navigator.vibrate) navigator.vibrate([30,60,30]);
+    showAlert('Code non reconnu', `${ean} n'est pas dans la liste`);
+    return;
+  }
+  let article;
+  if(candidates.length > 1 && invMode){
+    const m = document.getElementById('selMagasin').value;
+    const e = document.getElementById('selEmplacement').value;
+    article = candidates.find(r=>r.magasin===m && r.emplace===e) || candidates[0];
+  } else {
+    article = candidates[0];
+    if(candidates.length > 1){
+      toast('Plusieurs emplacements pour cet article : activez le mode inventaire pour préciser','err');
+    }
+  }
+
+  // l'article est-il déjà présent dans le tableau de travail (même article/magasin/emplacement) ?
+  const existingIdx = modifications.findIndex(r =>
+    r.article === article.article && r.magasin === article.magasin && r.emplacement === article.emplace);
+
+  if(existingIdx !== -1){
+    const row = modifications[existingIdx];
+    const currentCount = row.nouveauStock !== '' ? Number(row.nouveauStock) : Number(row.stock);
+    row.nouveauStock = String((isNaN(currentCount) ? 0 : currentCount) + 1);
+    saveLocalModifications();
+    flashIndex = existingIdx;
+  } else {
+    modifications.push({
+      article: article.article,
+      ean13: article.ean13,
+      titre: article.titre,
+      magasin: article.magasin,
+      emplacement: article.emplace,
+      stock: article.stock,
+      nouvelEmplacement: '',
+      nouveauStock: '1'
+    });
+    saveLocalModifications();
+    flashIndex = modifications.length - 1;
+  }
+  updateInventaireCounter();
+  renderTable();
+  beepSuccess();
+  if(navigator.vibrate) navigator.vibrate(40);
+}
+
+/* ---------- Capture clavier (douchette Zebra, sans touche Entrée) ----------
+   IMPORTANT : on ne donne plus le focus à un champ caché. Cela empêchait le
+   clavier logiciel de s'ouvrir, mais provoquait justement son apparition au
+   moindre clic sur l'écran. La douchette est maintenant capturée directement
+   au niveau du document. Le scanner Zebra peut donc continuer à envoyer ses
+   chiffres comme des frappes clavier, sans focus particulier. */
+let scanBuffer = '';
+let scanTimer = null;
+
+function resetScanBuffer(){
+  scanBuffer = '';
+  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
+}
+
+document.addEventListener('keydown', (e)=>{
+  // Pendant l'édition d'un champ ou dans les paramètres, les frappes
+  // doivent rester destinées au champ concerné.
+  if(isEditingField || document.getElementById('settingsModal').classList.contains('show')) return;
+
+  // Ne pas intercepter les séquences tapées manuellement dans un éventuel
+  // champ texte/select. La douchette, elle, envoie uniquement des chiffres.
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if(tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+  if(/^\d$/.test(e.key)){
+    e.preventDefault();
+    scanBuffer += e.key;
+
+    if(scanTimer) clearTimeout(scanTimer);
+    scanTimer = setTimeout(resetScanBuffer, 500);
+
+    if(scanBuffer.length >= 13){
+      const ean = scanBuffer.slice(0,13);
+      resetScanBuffer();
+      onScanValue(ean);
+    }
+  }
+});
+
+/* ---------- Caméra (iPhone et terminaux avec appareil photo) ---------- */
+let html5QrCode = null;
+async function startCamera(){
+  const camModal = document.getElementById('camModal');
+  camModal.classList.add('show');
+  html5QrCode = new Html5Qrcode('camReader', { formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.CODE_128 ] });
+  try{
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 12, qrbox: { width: 260, height: 140 } },
+      (decodedText)=>{ onScanValue(decodedText); },
+      ()=>{}
+    );
+  }catch(e){
+    toast('Caméra indisponible : '+e.message,'err');
+    stopCamera();
+  }
+}
+async function stopCamera(){
+  document.getElementById('camModal').classList.remove('show');
+  const instance = html5QrCode;
+  html5QrCode = null;
+  if(instance){
+    try{ await instance.stop(); instance.clear(); }catch(e){}
+  }
+  ensureScanFocus();
+}
+document.getElementById('btnCamClose').addEventListener('click', stopCamera);
+
+function hasCamera(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+// Le bouton SCAN ouvre systématiquement la caméra ; la douchette Zebra, elle,
+// reste écoutée en permanence via le champ caché — les deux fonctionnent ensemble.
+document.getElementById('btnScan').addEventListener('click', ()=>{
+  if(hasCamera()) startCamera();
+  else toast('Aucune caméra détectée sur cet appareil : utilisez la douchette','err');
+});
+
+/* ======================================================================
+   PARAMETRES GITHUB
+   ====================================================================== */
+document.getElementById('btnSettings').addEventListener('click', ()=>{
+  document.getElementById('inputToken').value = localStorage.getItem(LS_TOKEN) || '';
+  document.getElementById('settingsModal').classList.add('show');
+});
+document.getElementById('btnCloseSettings').addEventListener('click', ()=>{
+  document.getElementById('settingsModal').classList.remove('show');
+  ensureScanFocus();
+});
+document.getElementById('btnSaveToken').addEventListener('click', ()=>{
+  localStorage.setItem(LS_TOKEN, document.getElementById('inputToken').value.trim());
+  document.getElementById('settingsModal').classList.remove('show');
+  toast('Jeton enregistré','ok');
+  ensureScanFocus();
+});
+
+/* ======================================================================
+   INITIALISATION
+   ====================================================================== */
+loadLocalModifications();
+renderTable();
+loadDataTable();
+ensureScanFocus();
+</script>
+</body>
+</html>
