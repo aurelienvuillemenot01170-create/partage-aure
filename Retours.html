@@ -107,11 +107,23 @@
   }
   .empty-state{text-align:center;color:var(--ink-soft);padding:40px 20px;font-size:.9rem;}
 
-  /* ---------- Bouton SCAN ---------- */
+  /* ---------- Boutons SCAN / LOUPE ---------- */
   .scan-zone{flex:0 0 auto;padding:10px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg, rgba(238,242,241,0), var(--paper) 30%);}
-  #scanStatus{text-align:center;font-size:.78rem;color:var(--ink-soft);margin-bottom:6px;min-height:14px;}
+  .scan-buttons{display:flex;gap:10px;align-items:stretch;}
+  #btnSearch{
+    flex:0 0 25%;
+    padding:20px 0;
+    border:none;border-radius:16px;
+    background:radial-gradient(circle at 30% 20%, #1C7A72, var(--brand) 70%);
+    color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 0 var(--brand-dark), 0 10px 22px rgba(20,92,87,.35);
+    transition:transform .07s, box-shadow .1s;
+  }
+  #btnSearch:active{transform:translateY(4px);box-shadow:0 2px 0 var(--brand-dark), 0 4px 10px rgba(20,92,87,.3);}
   #btnScan{
-    width:100%;padding:20px;border:none;border-radius:16px;
+    flex:1 1 auto;
+    padding:20px;border:none;border-radius:16px;
     background:radial-gradient(circle at 30% 20%, #1C7A72, var(--brand) 70%);
     color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.2rem;letter-spacing:.5px;
     box-shadow:0 6px 0 var(--brand-dark), 0 10px 22px rgba(20,92,87,.35);
@@ -120,8 +132,6 @@
   #btnScan:active{
     transform:translateY(4px); box-shadow:0 2px 0 var(--brand-dark), 0 4px 10px rgba(20,92,87,.3);
   }
-  /* Le scan Zebra est capturé au niveau du document : aucun champ caché à focus, donc aucun clavier logiciel. */
-  #hiddenScanInput{display:none;}
 
   /* ---------- Camera modal ---------- */
   .cam-modal{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:80;}
@@ -153,6 +163,52 @@
   .btn-cancel{background:var(--paper);color:var(--ink);}
   .btn-confirm{background:var(--danger);color:#fff;}
   .btn-confirm.ok{background:var(--success);}
+
+  /* ---------- Modal de recherche (plein écran) ---------- */
+  .search-modal{
+    position:fixed;inset:0;background:var(--paper);
+    display:none;flex-direction:column;z-index:85;
+  }
+  .search-modal.show{display:flex;}
+  .search-header{
+    flex:0 0 auto;background:var(--surface);
+    padding:12px 14px;
+    padding-top:max(12px, env(safe-area-inset-top));
+    border-bottom:1px solid var(--line);
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+  }
+  .search-input-wrap{position:relative;}
+  #searchInput{
+    width:100%;
+    padding:12px 44px 12px 14px;
+    border:1px solid var(--line);border-radius:10px;
+    font-size:1rem;font-family:'IBM Plex Sans',sans-serif;
+    outline:none;background:#F5F8F7;
+  }
+  #searchInput:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(20,92,87,.12);}
+  .search-close{
+    position:absolute;top:50%;right:8px;transform:translateY(-50%);
+    width:32px;height:32px;border:none;border-radius:50%;
+    background:transparent;color:var(--ink-soft);font-size:1.1rem;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .search-close:active{background:var(--paper);}
+  .search-actions{display:flex;gap:10px;margin-top:10px;}
+  .search-actions button{
+    flex:1;border:none;border-radius:10px;padding:11px 8px;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.9rem;color:#fff;
+    letter-spacing:.1px;transition:transform .08s, box-shadow .1s;
+  }
+  .search-actions .btn-search-ok{background:var(--success);box-shadow:0 3px 0 var(--success-dark);}
+  .search-actions .btn-search-ok:active{transform:translateY(2px);box-shadow:0 1px 0 var(--success-dark);}
+  .search-actions .btn-search-cancel{background:var(--danger);box-shadow:0 3px 0 var(--danger-dark);}
+  .search-actions .btn-search-cancel:active{transform:translateY(2px);box-shadow:0 1px 0 var(--danger-dark);}
+  .search-results{
+    flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:12px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  .search-card{cursor:pointer;transition:transform .07s;}
+  .search-card:active{transform:scale(.99);}
 </style>
 </head>
 <body>
@@ -190,14 +246,36 @@
   </div>
 
   <div class="scan-zone">
-    <div id="scanStatus">Douchette toujours active — SCAN ouvre la caméra</div>
-    <button id="btnScan">◉ SCAN</button>
+    <div class="scan-buttons">
+      <button id="btnSearch" aria-label="Rechercher un article">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+        </svg>
+      </button>
+      <button id="btnScan">◉ SCAN</button>
+    </div>
   </div>
 
   <div class="cam-modal" id="camModal">
     <button class="cam-close" id="btnCamClose">✕</button>
     <div id="camReader"></div>
     <div class="cam-hint">Visez le code-barres EAN13 de l'article</div>
+  </div>
+
+  <!-- Modal de recherche plein écran -->
+  <div class="search-modal" id="searchModal">
+    <div class="search-header">
+      <div class="search-input-wrap">
+        <input type="text" id="searchInput" placeholder="Rechercher un article, EAN, magasin…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button class="search-close" id="searchClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="search-actions">
+        <button class="btn-search-ok" id="searchOk">OK</button>
+        <button class="btn-search-cancel" id="searchCancel">Annuler</button>
+      </div>
+    </div>
+    <div class="search-results" id="searchResults"></div>
   </div>
 
   <div id="toast"></div>
@@ -261,6 +339,9 @@ function safeParseArray(content){
   if(Array.isArray(parsed)) return parsed;
   if(parsed && typeof parsed === 'object') return Object.values(parsed);
   return [];
+}
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function saveLocalModifications(){
   localStorage.setItem(LS_LOCAL_MOD, JSON.stringify(modifications));
@@ -528,7 +609,6 @@ async function confirmDeleteRow(idx){
     updateInventaireCounter();
     renderTable();
   }
-  ensureScanFocus();
 }
 
 /* ======================================================================
@@ -673,9 +753,11 @@ function resetScanBuffer(){
 }
 
 document.addEventListener('keydown', (e)=>{
-  // Pendant l'édition d'un champ ou dans les paramètres, les frappes
-  // doivent rester destinées au champ concerné.
-  if(isEditingField || document.getElementById('settingsModal').classList.contains('show')) return;
+  // Pendant l'édition d'un champ ou dans les paramètres / recherche, les
+  // frappes doivent rester destinées au champ concerné.
+  if(isEditingField
+     || document.getElementById('settingsModal').classList.contains('show')
+     || document.getElementById('searchModal').classList.contains('show')) return;
 
   // Ne pas intercepter les séquences tapées manuellement dans un éventuel
   // champ texte/select. La douchette, elle, envoie uniquement des chiffres.
@@ -722,7 +804,6 @@ async function stopCamera(){
   if(instance){
     try{ await instance.stop(); instance.clear(); }catch(e){}
   }
-  ensureScanFocus();
 }
 document.getElementById('btnCamClose').addEventListener('click', stopCamera);
 
@@ -731,10 +812,92 @@ function hasCamera(){
 }
 
 // Le bouton SCAN ouvre systématiquement la caméra ; la douchette Zebra, elle,
-// reste écoutée en permanence via le champ caché — les deux fonctionnent ensemble.
+// reste écoutée en permanence via la capture clavier globale.
 document.getElementById('btnScan').addEventListener('click', ()=>{
   if(hasCamera()) startCamera();
   else toast('Aucune caméra détectée sur cet appareil : utilisez la douchette','err');
+});
+
+/* ======================================================================
+   RECHERCHE DANS LE RÉFÉRENTIEL ARTICLE (loupe)
+   ====================================================================== */
+function openSearchModal(){
+  document.getElementById('searchModal').classList.add('show');
+  const inp = document.getElementById('searchInput');
+  inp.value = '';
+  renderSearchResults('');
+  // Focus immédiat + relance après un tick (pour garantir l'ouverture du
+  // clavier logiciel sur iOS/Android).
+  try{ inp.focus(); }catch(e){}
+  setTimeout(()=>{ try{ inp.focus(); }catch(e){} }, 60);
+}
+
+function closeSearchModal(){
+  document.getElementById('searchModal').classList.remove('show');
+  try{ document.getElementById('searchInput').blur(); }catch(e){}
+}
+
+function renderSearchResults(query){
+  const container = document.getElementById('searchResults');
+  const q = String(query || '').trim().toLowerCase();
+  let rows = dataTable;
+  if(q){
+    rows = dataTable.filter(r =>
+      [r.article, r.ean13, r.titre, r.magasin, r.emplace, r.stock]
+        .some(v => String(v ?? '').toLowerCase().includes(q))
+    );
+  }
+  if(rows.length === 0){
+    container.innerHTML = '<div class="empty-state">Aucun article ne correspond.</div>';
+    return;
+  }
+  container.innerHTML = rows.map(r => {
+    const empDisplay = (r.emplace === '' || r.emplace === undefined || r.emplace === null)
+      ? '--Vide--' : escapeHtml(r.emplace);
+    return `
+      <div class="rowcard inv-mismatch search-card" data-ean="${escapeHtml(r.ean13)}">
+        <div class="rc-titre">${escapeHtml(r.titre || '(sans titre)')}</div>
+        <div class="rc-meta">
+          <span>Art. ${escapeHtml(r.article)}</span>
+          <span>EAN ${escapeHtml(r.ean13)}</span>
+          <span>Mag. ${escapeHtml(r.magasin)}</span>
+        </div>
+        <div class="rc-editfields">
+          <div class="ef">
+            <label>Emplacement</label>
+            <span class="ef-value">${empDisplay}</span>
+          </div>
+          <div class="ef">
+            <label>Stock</label>
+            <span class="ef-value">${escapeHtml(r.stock)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+document.getElementById('btnSearch').addEventListener('click', openSearchModal);
+document.getElementById('searchClose').addEventListener('click', closeSearchModal);
+document.getElementById('searchCancel').addEventListener('click', closeSearchModal);
+document.getElementById('searchInput').addEventListener('input', (e)=> renderSearchResults(e.target.value));
+
+// Clic sur une carte : on récupère l'EAN et on le traite comme un scan.
+document.getElementById('searchResults').addEventListener('click', (e)=>{
+  const card = e.target.closest('.search-card');
+  if(!card) return;
+  const ean = card.dataset.ean;
+  closeSearchModal();
+  if(ean) onScanValue(ean);
+});
+
+// OK : on prend l'EAN de la carte en tête de liste affichée.
+document.getElementById('searchOk').addEventListener('click', ()=>{
+  const first = document.querySelector('#searchResults .search-card');
+  if(!first){ toast('Aucun article à sélectionner','err'); return; }
+  const ean = first.dataset.ean;
+  closeSearchModal();
+  if(ean) onScanValue(ean);
 });
 
 /* ======================================================================
@@ -746,13 +909,11 @@ document.getElementById('btnSettings').addEventListener('click', ()=>{
 });
 document.getElementById('btnCloseSettings').addEventListener('click', ()=>{
   document.getElementById('settingsModal').classList.remove('show');
-  ensureScanFocus();
 });
 document.getElementById('btnSaveToken').addEventListener('click', ()=>{
   localStorage.setItem(LS_TOKEN, document.getElementById('inputToken').value.trim());
   document.getElementById('settingsModal').classList.remove('show');
   toast('Jeton enregistré','ok');
-  ensureScanFocus();
 });
 
 /* ======================================================================
@@ -761,7 +922,6 @@ document.getElementById('btnSaveToken').addEventListener('click', ()=>{
 loadLocalModifications();
 renderTable();
 loadDataTable();
-ensureScanFocus();
 </script>
 </body>
 </html>
