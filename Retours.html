@@ -212,19 +212,6 @@
 </style>
 </head>
 <body>
-<!-- Champ invisible en permanence "focus" : sur les terminaux Zebra/Android,
-     la douchette (mode clavier / DataWedge) ne délivre ses frappes à la page
-     web que si un champ de saisie a réellement le focus. Ce champ doit
-     rester un input NORMAL et éditable (ni "readonly", ni inputmode="none") :
-     ces deux attributs empêchent Chrome d'établir la connexion clavier et
-     bloquent aussi les frappes d'un clavier externe (douchette comprise), pas
-     seulement le clavier logiciel. On évite plutôt l'ouverture du clavier
-     virtuel en empêchant le focus de quitter ce champ au clic (cf. plus bas),
-     de sorte qu'il n'a jamais besoin d'être "repris" pendant un geste utilisateur. -->
-<input id="scannerCapture" type="text" autocomplete="off" autocorrect="off"
-       autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1"
-       style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;pointer-events:none;">
-
   <div class="appbar">
     <h1>Retours — Terrain</h1>
     <button class="gear-btn" id="btnSettings">⚙</button>
@@ -258,6 +245,9 @@
   </div>
 
   <div class="scan-zone">
+    <input id="scannerCapture" type="text" inputmode="numeric" autocomplete="off" autocorrect="off"
+           autocapitalize="off" spellcheck="false" placeholder="Scanner un article (douchette)…"
+           style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--line,#ccc);font-size:15px;">
     <div class="scan-buttons">
       <button id="btnSearch" aria-label="Rechercher un article">
         <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
@@ -763,28 +753,18 @@ function onScanValue(ean){
   if(navigator.vibrate) navigator.vibrate(40);
 }
 
-/* ---------- Capture clavier (douchette Zebra, sans touche Entrée) ----------
+/* ---------- Capture clavier (douchette Zebra) ----------
    IMPORTANT : la douchette (mode clavier / DataWedge) n'envoie ses frappes
-   qu'à l'élément qui a effectivement le focus. #scannerCapture (défini juste
-   après <body>) reste focus en permanence sur l'écran principal pour les
-   recevoir ; voir plus bas comment on évite que le clavier logiciel ne
-   s'ouvre pour autant. */
-let scanBuffer = '';
-let scanTimer = null;
-
-function resetScanBuffer(){
-  scanBuffer = '';
-  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
-}
-
+   qu'à l'élément qui a effectivement le focus, et sur Android 10+ DataWedge
+   affiche/masque son propre clavier pendant l'envoi des touches (comportement
+   documenté par Zebra) : un champ *caché* s'est révélé peu fiable pour
+   recevoir ces frappes. #scannerCapture est donc un champ visible, en haut de
+   la zone de scan, qu'on garde focus en permanence sur l'écran principal — le
+   même principe que le champ de recherche, dont on sait qu'il capte bien la
+   douchette. On lit sa valeur au fil de la frappe (voir plus bas) plutôt que
+   d'intercepter les touches au niveau du document. */
 const scannerCaptureEl = document.getElementById('scannerCapture');
 
-// Sur PC/Mac, un clavier physique (ou une douchette en USB) envoie ses
-// événements au document même sans focus particulier. Sur les terminaux
-// Zebra/Android en revanche, il faut un champ effectivement focus pour que
-// les frappes de la douchette (DataWedge / HID) atteignent la page. On garde
-// donc #scannerCapture focus en permanence, sauf pendant l'édition d'un
-// champ réel ou quand une fenêtre modale est ouverte.
 function refocusScanCapture(){
   if(isEditingField
      || document.getElementById('settingsModal').classList.contains('show')
@@ -798,16 +778,10 @@ window.addEventListener('focus', refocusScanCapture);
 refocusScanCapture();
 
 // Empêche les boutons et icônes de "voler" le focus au moment du clic, plutôt
-// que de le reprendre après coup. C'est cette reprise après coup (dans un
-// gestionnaire déclenché par un vrai geste utilisateur) qui provoquait
-// l'ouverture du clavier logiciel dans l'ancienne version. En bloquant le
-// focus dès le mousedown/touchstart sur ces éléments, #scannerCapture ne
-// perd jamais vraiment le focus pendant l'usage normal de l'écran principal,
-// et le clavier n'a donc jamais l'occasion de se rouvrir.
+// que de le reprendre après coup, pour limiter les allers-retours de focus
+// (et donc les apparitions/disparitions du clavier) pendant l'usage normal.
 function guardFocus(e){
   const target = e.target.closest('button, .gear-btn');
-  // On ne touche jamais aux vrais champs de saisie (recherche, token, édition
-  // d'une ligne) : ceux-là doivent recevoir le focus normalement.
   if(target && !e.target.closest('input, textarea, select')){
     e.preventDefault();
   }
@@ -815,34 +789,35 @@ function guardFocus(e){
 document.addEventListener('mousedown', guardFocus, true);
 document.addEventListener('touchstart', guardFocus, {capture:true, passive:false});
 
-document.addEventListener('keydown', (e)=>{
-  // Pendant l'édition d'un champ ou dans les paramètres / recherche, les
-  // frappes doivent rester destinées au champ concerné.
-  if(isEditingField
-     || document.getElementById('settingsModal').classList.contains('show')
-     || document.getElementById('searchModal').classList.contains('show')) return;
-
-  // Ne pas intercepter les séquences tapées manuellement dans un éventuel
-  // champ texte/select réel. Le champ #scannerCapture, lui, reste autorisé :
-  // c'est justement lui qui reçoit les frappes de la douchette. La douchette
-  // n'envoie que des chiffres.
-  const tag = (e.target && e.target.tagName || '').toLowerCase();
-  if((tag === 'input' || tag === 'textarea' || tag === 'select') && e.target !== scannerCaptureEl) return;
-
-  if(/^\d$/.test(e.key)){
+let scanDebounce = null;
+function processScanCaptureValue(){
+  if(scanDebounce){ clearTimeout(scanDebounce); scanDebounce = null; }
+  const val = scannerCaptureEl.value.replace(/\s+/g,'').trim();
+  scannerCaptureEl.value = '';
+  if(val.length >= 6){ onScanValue(val); } // longueur mini plausible d'un code-barres
+}
+scannerCaptureEl.addEventListener('input', ()=>{
+  const digitsOnly = scannerCaptureEl.value.replace(/\D/g,'');
+  if(scanDebounce) clearTimeout(scanDebounce);
+  if(digitsOnly.length >= 13){
+    // EAN-13 complet : on traite immédiatement, pas besoin d'attendre une pause.
+    scannerCaptureEl.value = '';
+    onScanValue(digitsOnly.slice(0,13));
+    return;
+  }
+  // Codes plus courts (EAN-8, UPC-A…) ou fin de frappe sans caractère de fin
+  // explicite : on attend une courte pause dans la frappe avant de traiter.
+  scanDebounce = setTimeout(processScanCaptureValue, 300);
+});
+scannerCaptureEl.addEventListener('keydown', (e)=>{
+  // Si la douchette envoie une touche de fin (Tab/Entrée), on traite tout de
+  // suite au lieu d'attendre le timeout.
+  if(e.key === 'Enter' || e.key === 'Tab'){
     e.preventDefault();
-    scanBuffer += e.key;
-
-    if(scanTimer) clearTimeout(scanTimer);
-    scanTimer = setTimeout(resetScanBuffer, 500);
-
-    if(scanBuffer.length >= 13){
-      const ean = scanBuffer.slice(0,13);
-      resetScanBuffer();
-      onScanValue(ean);
-    }
+    processScanCaptureValue();
   }
 });
+
 
 /* ---------- Caméra (iPhone et terminaux avec appareil photo) ---------- */
 let html5QrCode = null;
