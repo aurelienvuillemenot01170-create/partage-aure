@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retours — Chargement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<style>
+  :root{
+    --ink:#16232B;
+    --ink-soft:#4B5B62;
+    --paper:#EEF2F1;
+    --surface:#FFFFFF;
+    --line:#D9E1DE;
+    --brand:#145C57;
+    --brand-dark:#0E403C;
+    --amber:#D98E2B;
+    --amber-soft:#F6E4C4;
+    --success:#3C8A5C;
+    --success-soft:#DCEEE3;
+    --danger:#B23A2E;
+    --danger-soft:#F7DEDA;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk',sans-serif;}
+  ::selection{background:var(--amber-soft);}
+
+  /* ---------- App bar ---------- */
+  .appbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 28px;background:var(--brand);color:#fff;
+    box-shadow:0 2px 10px rgba(14,64,60,.25);
+    position:sticky;top:0;z-index:40;
+  }
+  .appbar .brand{display:flex;align-items:center;gap:12px;}
+  .appbar .brand .mark{
+    width:34px;height:34px;border-radius:8px;background:var(--amber);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--brand-dark);
+  }
+  .appbar h1{font-size:1.15rem;margin:0;font-weight:600;letter-spacing:.2px;}
+  .appbar .sub{font-size:.78rem;color:#CFE3DF;margin-top:2px;}
+  .gear-btn{
+    width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.08);color:#fff;cursor:pointer;font-size:1.1rem;
+    display:flex;align-items:center;justify-content:center;transition:background .15s;
+  }
+  .gear-btn:hover{background:rgba(255,255,255,.2);}
+
+  /* ---------- Tabs ---------- */
+  .tabbar{
+    display:flex;gap:6px;padding:14px 28px 0;background:var(--paper);
+    position:sticky;top:74px;z-index:30;
+  }
+  .tab{
+    padding:10px 20px;border-radius:10px 10px 0 0;cursor:pointer;
+    font-weight:600;font-size:.92rem;color:var(--ink-soft);
+    background:transparent;border:1px solid transparent;
+  }
+  .tab.active{background:var(--surface);color:var(--brand-dark);border-color:var(--line);border-bottom-color:var(--surface);}
+  .panel{display:none;padding:22px 28px 48px;}
+  .panel.active{display:block;}
+
+  /* ---------- Cards ---------- */
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px 22px;margin-bottom:18px;
+  }
+  .card h2{font-size:1.02rem;margin:0 0 4px;color:var(--brand-dark);}
+  .card .hint{color:var(--ink-soft);font-size:.85rem;margin:0 0 14px;line-height:1.5;}
+
+  /* ---------- Paste zone ---------- */
+  #pasteZone{
+    width:100%;min-height:160px;border:2px dashed var(--line);border-radius:var(--radius);
+    padding:14px;font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ink);
+    background:#FBFCFB;resize:vertical;
+  }
+  #pasteZone:focus{outline:none;border-color:var(--brand);background:#fff;}
+
+  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px;}
+  .stat{
+    background:var(--paper);border-radius:8px;padding:8px 14px;font-size:.85rem;color:var(--ink-soft);
+  }
+  .stat b{color:var(--ink);font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- Buttons ---------- */
+  button{font-family:inherit;cursor:pointer;}
+  .btn{
+    border:none;border-radius:9px;padding:11px 20px;font-weight:600;font-size:.9rem;
+    transition:transform .08s ease, box-shadow .15s ease; letter-spacing:.1px;
+  }
+  .btn:active{transform:scale(.97);}
+  .btn-primary{background:var(--brand);color:#fff;}
+  .btn-primary:hover{background:var(--brand-dark);}
+  .btn-ghost{background:transparent;color:var(--brand-dark);border:1px solid var(--line);}
+  .btn-ghost:hover{background:var(--paper);}
+  .btn-send{
+    background:var(--amber);color:#3A2705;font-size:.95rem;padding:13px 26px;
+    box-shadow:0 3px 0 #A6690F;
+  }
+  .btn-send:hover{filter:brightness(1.04);}
+  .btn-send:active{box-shadow:0 1px 0 #A6690F;transform:translateY(2px) scale(.99);}
+  .btn-danger-ghost{background:transparent;color:var(--danger);border:1px solid var(--danger-soft);}
+  .btn-danger-ghost:hover{background:var(--danger-soft);}
+  .btn-print{background:var(--ink);color:#fff;}
+
+  .top-actions{
+    display:flex;justify-content:flex-end;gap:10px;padding:14px 28px 0;
+  }
+
+  /* ---------- Table shell ---------- */
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);max-height:62vh;background:#fff;}
+  table{border-collapse:collapse;width:100%;font-size:.86rem;min-width:900px;}
+  thead th{
+    position:sticky;top:0;background:var(--brand);color:#fff;z-index:5;
+    padding:0;border-right:1px solid rgba(255,255,255,.15);
+  }
+  .th-inner{padding:9px 10px 6px;cursor:grab;user-select:none;}
+  .th-inner:active{cursor:grabbing;}
+  .th-label{display:flex;align-items:center;gap:6px;font-weight:600;font-family:'Space Grotesk',sans-serif;font-size:.78rem;letter-spacing:.2px;}
+  .sort-arrow{font-size:.7rem;opacity:.8;}
+  .th-controls{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+  .th-controls label{display:flex;align-items:center;gap:5px;font-size:.68rem;font-weight:400;color:#DCEDEA;}
+  .th-controls select{
+    font-size:.68rem;border-radius:5px;border:none;padding:2px 4px;color:var(--ink);
+  }
+  .filter-row td{background:#F5F8F7;padding:5px 8px;border-bottom:1px solid var(--line);}
+  .filter-row input{
+    width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:.78rem;
+  }
+  tbody td{padding:8px 10px;border-bottom:1px solid #EEF1EC;vertical-align:middle;color:var(--ink);}
+  tbody tr:hover{background:#F7FAF9;}
+  .col-dragover{background:var(--amber-soft) !important;}
+  .barcode-cell{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
+  .barcode-cell svg{max-height:34px;}
+  .barcode-caption{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--ink-soft);}
+  .row-delete-btn{
+    border:none;background:transparent;color:var(--ink-soft);cursor:pointer;
+    font-size:1rem;padding:4px 8px;border-radius:6px;transition:background .12s,color .12s;
+  }
+  .row-delete-btn:hover{background:var(--danger-soft);color:var(--danger);}
+  .th-actions{text-align:center;}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:600;}
+  .badge-new{background:var(--success-soft);color:var(--success);}
+  .badge-existing{background:var(--paper);color:var(--ink-soft);}
+
+  /* ---------- Toast ---------- */
+  #toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:12px 22px;border-radius:9px;font-size:.88rem;
+    opacity:0;pointer-events:none;transition:all .25s ease;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.err{background:var(--danger);}
+  #toast.ok{background:var(--success);}
+
+  /* ---------- Modal ---------- */
+  .modal-back{
+    position:fixed;inset:0;background:rgba(20,30,28,.45);display:none;
+    align-items:center;justify-content:center;z-index:90;
+  }
+  .modal-back.show{display:flex;}
+  .modal{
+    background:#fff;border-radius:12px;padding:26px 26px 20px;width:min(420px,88vw);
+    box-shadow:0 20px 60px rgba(0,0,0,.3);
+  }
+  .modal h3{margin-top:0;}
+  .modal label{display:block;font-size:.82rem;color:var(--ink-soft);margin:12px 0 5px;}
+  .modal input[type=password],.modal input[type=text]{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:.88rem;
+  }
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;}
+  .modal .status-line{font-size:.8rem;margin-top:10px;color:var(--ink-soft);}
+
+  @media print{
+    .appbar,.tabbar,.top-actions,.card.no-print,#toast,.modal-back,.filter-row,.th-controls,.gear-btn,.th-actions,.row-delete-btn{display:none !important;}
+    thead th.th-actions, tbody td:last-child{display:none !important;}
+    body{background:#fff;}
+    .table-wrap{max-height:none;border:none;overflow:visible;}
+    thead th{position:static;background:#fff !important;color:#000 !important;border-bottom:2px solid #000;}
+    .th-label{color:#000;}
+    tbody td{color:#000;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="appbar">
+    <div class="brand">
+      <div class="mark">R</div>
+      <div>
+        <h1>Retours — Chargement</h1>
+        <div class="sub">Alimentation du référentiel article &amp; suivi des modifications terrain</div>
+      </div>
+    </div>
+    <button class="gear-btn" id="btnSettings" title="Paramètres GitHub">⚙</button>
+  </div>
+
+  <div class="tabbar">
+    <div class="tab active" data-tab="donnees">Données</div>
+    <div class="tab" data-tab="modifications">Modifications</div>
+  </div>
+
+  <!-- ===================== ONGLET DONNEES ===================== -->
+  <div class="panel active" id="panel-donnees">
+    <div class="card">
+      <h2>Coller un extrait de la table article</h2>
+      <p class="hint">Collez ici une ou plusieurs extractions (au format identique à STO0771.xls). Les en-têtes répétées à chaque collage sont automatiquement détectées et ignorées. Vous pouvez coller plusieurs milliers de lignes en plusieurs fois : chaque ajout vient compléter le tableau ci-dessous.</p>
+      <textarea id="pasteZone" placeholder="Collez ici les colonnes copiées depuis l'extraction (N° Société, N° Article, Code Ean13, Titre, Prix HT Frs2, Code Magasin, Emplace, Stock Physique, ...)"></textarea>
+      <div class="row">
+        <button class="btn btn-primary" id="btnAnalyse">Analyser &amp; ajouter au tableau</button>
+        <button class="btn btn-ghost" id="btnClearPaste">Vider la zone</button>
+        <div class="stat">Lignes en attente d'envoi : <b id="statPending">0</b></div>
+        <div class="stat">Total référencé (dernier envoi) : <b id="statTotal">0</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-top:0;">
+        <div>
+          <h2 style="margin-bottom:2px;">Table article consolidée</h2>
+          <p class="hint" style="margin-bottom:0;">Clé de fusion : N° Article + Code Magasin + Emplace. Un nouveau collage remplace la ligne existante si la clé correspond déjà.</p>
+        </div>
+        <div class="row" style="margin-top:0;">
+          <button class="btn btn-send" id="btnSend">Envoyer vers le GIST</button>
+          <button class="btn btn-danger-ghost" id="btnEmptyGist">Vider le GIST</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th><div class="th-inner"><div class="th-label">N° Article</div></div></th>
+              <th><div class="th-inner"><div class="th-label">Code Ean13</div></div></th>
+              <th><div class="th-inner"><div class="th-label">Titre</div></div></th>
+              <th><div class="th-inner"><div class="th-label">Magasin</div></div></th>
+              <th><div class="th-inner"><div class="th-label">Emplace</div></div></th>
+              <th><div class="th-inner"><div class="th-label">Stock</div></div></th>
+              <th><div class="th-inner"><div class="th-label">État</div></div></th>
+            </tr>
+          </thead>
+          <tbody id="dataTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== ONGLET MODIFICATIONS ===================== -->
+  <div class="panel" id="panel-modifications">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-top:0;">
+        <div>
+          <h2 style="margin-bottom:2px;">Table des modifications terrain</h2>
+          <p class="hint" style="margin-bottom:0;">Chargée automatiquement depuis le GIST « retours-modifications.json ». Triez, filtrez, réordonnez les colonnes par glisser-déposer, puis activez l'encodage code-barre par colonne avant impression.</p>
+        </div>
+        <div class="row" style="margin-top:0;">
+          <button class="btn btn-ghost" id="btnRefreshModif">↻ Actualiser</button>
+          <button class="btn btn-print" id="btnPrint">Imprimer</button>
+          <button class="btn btn-danger-ghost" id="btnEmptyModifGist">Vider le GIST</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="stat">Lignes chargées : <b id="statModifCount">0</b></div>
+        <div class="stat" id="statModifSync">—</div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table id="modifTable">
+          <thead>
+            <tr id="modifHeadRow"></tr>
+            <tr class="filter-row" id="modifFilterRow"></tr>
+          </thead>
+          <tbody id="modifTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <!-- Modal choix envoi : remplacer ou ajouter -->
+  <div class="modal-back" id="sendModal">
+    <div class="modal">
+      <h3>Envoyer vers le GIST</h3>
+      <p class="hint" style="margin-top:-6px;" id="sendModalText"></p>
+      <div class="actions" style="justify-content:flex-start;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="sendCancel">Annuler</button>
+        <button class="btn btn-ghost" id="sendAppend" style="border-color:var(--brand);color:var(--brand-dark);">Ajouter au GIST existant</button>
+        <button class="btn btn-primary" id="sendReplace" style="background:var(--danger);">Remplacer entièrement le GIST</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal paramètres -->
+  <div class="modal-back" id="settingsModal">
+    <div class="modal">
+      <h3>Connexion GitHub</h3>
+      <p class="hint" style="margin-top:-6px;">Un jeton d'accès personnel (scope <code>gist</code>) est nécessaire pour écrire vers les GIST. La lecture des GIST publics ne le nécessite pas.</p>
+      <label>Jeton d'accès personnel (PAT)</label>
+      <input type="password" id="inputToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <div class="status-line" id="settingsStatus"></div>
+      <div class="actions">
+        <button class="btn btn-ghost" id="btnTestToken">Tester</button>
+        <button class="btn btn-primary" id="btnSaveToken">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ======================================================================
+   CONFIGURATION
+   ====================================================================== */
+const GIST_DATA_ID  = 'b9a88af354ce71fc0f6bdb304203c650';   // retours.json
+const GIST_MODIF_ID = '34b4d14fff9969bd8c730b70d819168b';   // retours-modifications.json
+const LS_TOKEN   = 'retours_gh_token';
+const LS_FN_DATA = 'retours_gist_data_filename';
+const LS_FN_MOD  = 'retours_gist_modif_filename';
+const DEFAULT_DEV_TOKEN = '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'; // jeton de développement, à remplacer avant mise en production
+if(!localStorage.getItem(LS_TOKEN)) localStorage.setItem(LS_TOKEN, DEFAULT_DEV_TOKEN);
+
+const DATA_COLS  = ['article','ean13','titre','magasin','emplace','stock'];
+const MODIF_COLS = [
+  {key:'article', label:'N° Article'},
+  {key:'ean13', label:'Ean13'},
+  {key:'titre', label:'Titre'},
+  {key:'magasin', label:'Magasin'},
+  {key:'emplacement', label:'Emplacement'},
+  {key:'stock', label:'Stock'},
+  {key:'nouvelEmplacement', label:'Nouvel emplacement'},
+  {key:'nouveauStock', label:'Nouveau stock'},
+];
+
+let dataTable = [];      // référentiel article consolidé (envoyé vers retours.json)
+let pendingRows = [];    // lignes fraîchement collées, pas encore envoyées
+let modifTable = [];     // table des modifications (lecture seule ici)
+let modifColumnOrder = MODIF_COLS.map(c=>c.key);
+let modifSort = {key:null, dir:1};
+let modifFilters = {};
+let modifEncodeState = {}; // {key: {enabled:bool, touche:'aucune'|'enter'|'tab'}}
+
+/* ======================================================================
+   UTILITAIRES UI
+   ====================================================================== */
+function toast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (kind ? ' '+kind : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.className='', 3200);
+}
+function keyOf(row){ return `${row.article}||${row.magasin}||${row.emplace}`; }
+function safeParseArray(content){
+  if(!content) return [];
+  let parsed;
+  try{ parsed = JSON.parse(content); }
+  catch(e){ return []; }
+  if(Array.isArray(parsed)) return parsed;
+  if(parsed && typeof parsed === 'object') return Object.values(parsed);
+  return [];
+}
+
+/* ======================================================================
+   API GITHUB GIST
+   ====================================================================== */
+function ghHeaders(needAuth){
+  const h = {'Accept':'application/vnd.github+json'};
+  const token = localStorage.getItem(LS_TOKEN);
+  if(needAuth && token) h['Authorization'] = 'token '+token;
+  return h;
+}
+async function ghGetGist(gistId){
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {headers: ghHeaders(false)});
+  if(!res.ok) throw new Error('Lecture GIST impossible ('+res.status+')');
+  return res.json();
+}
+async function ghReadFirstFile(gistId){
+  const gist = await ghGetGist(gistId);
+  const filenames = Object.keys(gist.files || {});
+  if(filenames.length === 0) throw new Error('Le GIST ne contient aucun fichier');
+  const filename = filenames[0];
+  let content = gist.files[filename].content;
+  if(gist.files[filename].truncated){
+    const raw = await fetch(gist.files[filename].raw_url);
+    content = await raw.text();
+  }
+  return {filename, content};
+}
+async function ghPatchFile(gistId, filename, content){
+  const token = localStorage.getItem(LS_TOKEN);
+  if(!token) throw new Error('Aucun jeton GitHub enregistré (⚙ Paramètres)');
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+    method:'PATCH',
+    headers:{...ghHeaders(true),'Content-Type':'application/json'},
+    body: JSON.stringify({files:{[filename]:{content}}})
+  });
+  if(!res.ok){
+    const body = await res.text();
+    throw new Error('Échec d\'envoi ('+res.status+') '+body.slice(0,140));
+  }
+  return res.json();
+}
+
+/* ======================================================================
+   ONGLETS
+   ====================================================================== */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
+    if(tab.dataset.tab === 'modifications' && modifTable.length===0){
+      loadModifTable();
+    }
+  });
+});
+
+/* ======================================================================
+   ONGLET DONNEES — parsing du collage
+   ====================================================================== */
+function looksLikeHeader(cols){
+  const a = (cols[1]||'').trim().toLowerCase();
+  const b = (cols[2]||'').trim().toLowerCase();
+  return a.includes('article') || b.includes('ean');
+}
+function parsePastedBlock(text){
+  const lines = text.split(/\r\n|\n|\r/).map(l=>l).filter(l=>l.trim().length>0);
+  const rows = [];
+  for(const line of lines){
+    const cols = line.split('\t');
+    if(cols.length < 8) continue;          // ligne incomplète, ignorée
+    if(looksLikeHeader(cols)) continue;    // en-tête répétée, ignorée
+    rows.push({
+      article: (cols[1]||'').trim(),
+      ean13:   (cols[2]||'').trim(),
+      titre:   (cols[3]||'').trim(),
+      magasin: (cols[5]||'').trim(),
+      emplace: (cols[6]||'').trim(),
+      stock:   (cols[7]||'').trim(),
+    });
+  }
+  return rows;
+}
+document.getElementById('btnAnalyse').addEventListener('click', ()=>{
+  const text = document.getElementById('pasteZone').value;
+  if(!text.trim()){ toast('Aucune donnée à analyser','err'); return; }
+  const rows = parsePastedBlock(text);
+  if(rows.length===0){ toast('Aucune ligne exploitable détectée (en-têtes ou format inattendu)','err'); return; }
+  // fusion sur pendingRows par clé
+  const map = new Map(pendingRows.map(r=>[keyOf(r), r]));
+  for(const r of rows) map.set(keyOf(r), r);
+  pendingRows = Array.from(map.values());
+  document.getElementById('pasteZone').value = '';
+  renderDataTable();
+  toast(rows.length + ' ligne(s) analysée(s) et ajoutée(s) au tableau','ok');
+});
+document.getElementById('btnClearPaste').addEventListener('click', ()=>{
+  document.getElementById('pasteZone').value = '';
+});
+
+function renderDataTable(){
+  document.getElementById('statPending').textContent = pendingRows.length;
+  document.getElementById('statTotal').textContent = dataTable.length;
+  const tbody = document.getElementById('dataTableBody');
+  tbody.innerHTML = '';
+  const existingKeys = new Set(dataTable.map(keyOf));
+  const combined = [
+    ...pendingRows.map(r=>({...r,_status: existingKeys.has(keyOf(r)) ? 'update':'new'})),
+    ...dataTable.slice(0,300).map(r=>({...r,_status:'existing'}))
+  ];
+  for(const r of combined){
+    const tr = document.createElement('tr');
+    const badge = r._status==='new' ? '<span class="badge badge-new">nouveau</span>'
+                : r._status==='update' ? '<span class="badge badge-new">mise à jour</span>'
+                : '<span class="badge badge-existing">déjà envoyé</span>';
+    tr.innerHTML = `<td>${r.article}</td><td>${r.ean13}</td><td>${r.titre}</td><td>${r.magasin}</td><td>${r.emplace}</td><td>${r.stock}</td><td>${badge}</td>`;
+    tbody.appendChild(tr);
+  }
+  if(dataTable.length>300){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="7" style="text-align:center;color:var(--ink-soft);font-style:italic;">… ${dataTable.length-300} lignes supplémentaires déjà envoyées (non affichées)</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function askSendMode(pendingCount, existingCount){
+  return new Promise(resolve=>{
+    document.getElementById('sendModalText').textContent =
+      `${pendingCount} ligne(s) en attente / ${existingCount} ligne(s) déjà présentes dans le GIST. Voulez-vous ajouter (fusionner) ces lignes au contenu existant, ou remplacer entièrement le GIST par les seules lignes en attente ?`;
+    const modal = document.getElementById('sendModal');
+    modal.classList.add('show');
+    const btnReplace = document.getElementById('sendReplace');
+    const btnAppend = document.getElementById('sendAppend');
+    const btnCancel = document.getElementById('sendCancel');
+    const cleanup = (val)=>{
+      modal.classList.remove('show');
+      btnReplace.removeEventListener('click', onReplace);
+      btnAppend.removeEventListener('click', onAppend);
+      btnCancel.removeEventListener('click', onCancel);
+      resolve(val);
+    };
+    const onReplace = ()=>cleanup('replace');
+    const onAppend = ()=>cleanup('append');
+    const onCancel = ()=>cleanup(null);
+    btnReplace.addEventListener('click', onReplace);
+    btnAppend.addEventListener('click', onAppend);
+    btnCancel.addEventListener('click', onCancel);
+  });
+}
+
+document.getElementById('btnSend').addEventListener('click', async ()=>{
+  if(pendingRows.length===0){ toast('Rien à envoyer','err'); return; }
+  const mode = await askSendMode(pendingRows.length, dataTable.length);
+  if(!mode) return;
+  try{
+    let merged;
+    if(mode === 'replace'){
+      merged = pendingRows.slice();
+    } else {
+      const map = new Map(dataTable.map(r=>[keyOf(r), r]));
+      for(const r of pendingRows) map.set(keyOf(r), r);
+      merged = Array.from(map.values());
+    }
+    let filename = localStorage.getItem(LS_FN_DATA);
+    if(!filename){
+      const first = await ghReadFirstFile(GIST_DATA_ID);
+      filename = first.filename;
+      localStorage.setItem(LS_FN_DATA, filename);
+    }
+    await ghPatchFile(GIST_DATA_ID, filename, JSON.stringify(merged));
+    dataTable = merged;
+    pendingRows = [];
+    renderDataTable();
+    toast((mode==='replace' ? 'GIST remplacé' : 'Référentiel mis à jour') + ' avec succès ('+merged.length+' lignes)','ok');
+  }catch(e){
+    toast(e.message,'err');
+  }
+});
+
+document.getElementById('btnEmptyGist').addEventListener('click', async ()=>{
+  if(!confirm('Vider complètement le GIST « retours.json » ?\nToutes les données du référentiel seront supprimées définitivement. Les lignes en attente de collage ne seront pas affectées.')) return;
+  try{
+    let filename = localStorage.getItem(LS_FN_DATA);
+    if(!filename){
+      const first = await ghReadFirstFile(GIST_DATA_ID);
+      filename = first.filename;
+      localStorage.setItem(LS_FN_DATA, filename);
+    }
+    await ghPatchFile(GIST_DATA_ID, filename, JSON.stringify([]));
+    dataTable = [];
+    renderDataTable();
+    toast('GIST vidé avec succès','ok');
+  }catch(e){
+    toast(e.message,'err');
+  }
+});
+
+async function loadDataTable(){
+  try{
+    const {filename, content} = await ghReadFirstFile(GIST_DATA_ID);
+    localStorage.setItem(LS_FN_DATA, filename);
+    dataTable = safeParseArray(content);
+  }catch(e){
+    dataTable = [];
+    toast('Référentiel non chargé : '+e.message,'err');
+  }
+  renderDataTable();
+}
+
+/* ======================================================================
+   ONGLET MODIFICATIONS
+   ====================================================================== */
+MODIF_COLS.forEach(c=> modifEncodeState[c.key] = {enabled:false, touche:'aucune'});
+
+async function loadModifTable(){
+  document.getElementById('statModifSync').textContent = 'Chargement…';
+  try{
+    const {filename, content} = await ghReadFirstFile(GIST_MODIF_ID);
+    localStorage.setItem(LS_FN_MOD, filename);
+    modifTable = safeParseArray(content);
+    document.getElementById('statModifSync').textContent = 'Synchronisé à ' + new Date().toLocaleTimeString('fr-FR');
+    toast('Table des modifications actualisée','ok');
+  }catch(e){
+    modifTable = [];
+    document.getElementById('statModifSync').textContent = 'Erreur de synchronisation';
+    toast(e.message,'err');
+  }
+  renderModifHead();
+  renderModifTable();
+}
+document.getElementById('btnRefreshModif').addEventListener('click', loadModifTable);
+
+function renderModifHead(){
+  const headRow = document.getElementById('modifHeadRow');
+  const filterRow = document.getElementById('modifFilterRow');
+  headRow.innerHTML = '';
+  filterRow.innerHTML = '';
+  for(const key of modifColumnOrder){
+    const col = MODIF_COLS.find(c=>c.key===key);
+    const th = document.createElement('th');
+    th.draggable = true;
+    th.dataset.key = key;
+    const arrow = modifSort.key===key ? (modifSort.dir===1?'▲':'▼') : '';
+    th.innerHTML = `
+      <div class="th-inner">
+        <div class="th-label" data-sort="${key}">${col.label} <span class="sort-arrow">${arrow}</span></div>
+        <div class="th-controls">
+          <label><input type="checkbox" data-encode="${key}" ${modifEncodeState[key].enabled?'checked':''}> Encoder</label>
+          <select data-touche="${key}">
+            <option value="aucune">Touche : Aucune</option>
+            <option value="enter">Touche : Entrée</option>
+            <option value="tab">Touche : Tabulation</option>
+          </select>
+        </div>
+      </div>`;
+    th.querySelector('[data-touche]').value = modifEncodeState[key].touche;
+    headRow.appendChild(th);
+
+    const td = document.createElement('td');
+    td.innerHTML = `<input type="text" placeholder="Filtrer…" data-filter="${key}" value="${modifFilters[key]||''}">`;
+    filterRow.appendChild(td);
+  }
+  // Colonne fixe "Actions" (non triable, non déplaçable, non filtrable)
+  const thActions = document.createElement('th');
+  thActions.className = 'th-actions';
+  thActions.innerHTML = `<div class="th-inner"><div class="th-label">Actions</div></div>`;
+  headRow.appendChild(thActions);
+  filterRow.appendChild(document.createElement('td'));
+  // Tri au clic
+  headRow.querySelectorAll('[data-sort]').forEach(el=>{
+    el.style.cursor='pointer';
+    el.addEventListener('click', ()=>{
+      const k = el.dataset.sort;
+      if(modifSort.key===k) modifSort.dir *= -1; else { modifSort.key=k; modifSort.dir=1; }
+      renderModifHead(); renderModifTable();
+    });
+  });
+  // Encodage
+  headRow.querySelectorAll('[data-encode]').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); });
+    el.addEventListener('change', ()=>{
+      modifEncodeState[el.dataset.encode].enabled = el.checked;
+      renderModifTable();
+    });
+  });
+  headRow.querySelectorAll('[data-touche]').forEach(el=>{
+    el.addEventListener('click', (e)=> e.stopPropagation());
+    el.addEventListener('change', ()=>{
+      modifEncodeState[el.dataset.touche].touche = el.value;
+      renderModifTable();
+    });
+  });
+  // Filtres
+  filterRow.querySelectorAll('[data-filter]').forEach(el=>{
+    el.addEventListener('input', ()=>{
+      modifFilters[el.dataset.filter] = el.value;
+      renderModifTable();
+    });
+  });
+  // Glisser-déposer colonnes
+  let dragKey = null;
+  headRow.querySelectorAll('th[draggable="true"]').forEach(th=>{
+    th.addEventListener('dragstart', ()=>{ dragKey = th.dataset.key; });
+    th.addEventListener('dragover', (e)=>{ e.preventDefault(); th.classList.add('col-dragover'); });
+    th.addEventListener('dragleave', ()=> th.classList.remove('col-dragover'));
+    th.addEventListener('drop', ()=>{
+      th.classList.remove('col-dragover');
+      const targetKey = th.dataset.key;
+      if(dragKey && dragKey!==targetKey){
+        const from = modifColumnOrder.indexOf(dragKey);
+        const to = modifColumnOrder.indexOf(targetKey);
+        modifColumnOrder.splice(from,1);
+        modifColumnOrder.splice(to,0,dragKey);
+        renderModifHead(); renderModifTable();
+      }
+    });
+  });
+}
+
+function renderModifTable(){
+  let rows = modifTable.slice();
+  for(const key in modifFilters){
+    const v = (modifFilters[key]||'').toLowerCase();
+    if(v) rows = rows.filter(r => String(r[key]??'').toLowerCase().includes(v));
+  }
+  if(modifSort.key){
+    rows.sort((a,b)=>{
+      const av = String(a[modifSort.key]??''), bv = String(b[modifSort.key]??'');
+      return av.localeCompare(bv,'fr',{numeric:true}) * modifSort.dir;
+    });
+  }
+  document.getElementById('statModifCount').textContent = rows.length;
+  const tbody = document.getElementById('modifTableBody');
+  tbody.innerHTML = '';
+  rows.forEach((r,i)=>{
+    const tr = document.createElement('tr');
+    for(const key of modifColumnOrder){
+      const td = document.createElement('td');
+      const val = r[key] ?? '';
+      const state = modifEncodeState[key];
+      if(state && state.enabled && val !== ''){
+        const svgId = 'bc_'+i+'_'+key;
+        td.innerHTML = `<div class="barcode-cell"><svg id="${svgId}"></svg><span class="barcode-caption">${val}</span></div>`;
+        tr.appendChild(td);
+        setTimeout(()=>{
+          let encoded = String(val);
+          if(state.touche==='enter') encoded += '\r';
+          if(state.touche==='tab') encoded += '\t';
+          try{
+            JsBarcode('#'+svgId, encoded, {format:'CODE128', displayValue:false, height:34, margin:2, width:1.4});
+          }catch(e){ /* valeur non encodable, cellule laissée vide */ }
+        },0);
+      } else {
+        td.textContent = val;
+        tr.appendChild(td);
+      }
+    }
+    // Colonne actions : suppression contextuelle de la ligne
+    const tdActions = document.createElement('td');
+    tdActions.style.textAlign = 'center';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'row-delete-btn';
+    delBtn.title = 'Supprimer cette ligne';
+    delBtn.innerHTML = '🗑';
+    delBtn.addEventListener('click', ()=> deleteModifRow(r));
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteModifRow(row){
+  if(!confirm(`Supprimer cette ligne ?\n${row.titre || row.article} (Art. ${row.article})`)) return;
+  const idx = modifTable.indexOf(row);
+  if(idx === -1) return;
+  modifTable.splice(idx, 1);
+  renderModifTable();
+  try{
+    let filename = localStorage.getItem(LS_FN_MOD);
+    if(!filename){
+      const first = await ghReadFirstFile(GIST_MODIF_ID);
+      filename = first.filename;
+      localStorage.setItem(LS_FN_MOD, filename);
+    }
+    await ghPatchFile(GIST_MODIF_ID, filename, JSON.stringify(modifTable));
+    toast('Ligne supprimée du GIST','ok');
+  }catch(e){
+    toast('Suppression locale seulement : '+e.message,'err');
+  }
+}
+
+document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
+
+document.getElementById('btnEmptyModifGist').addEventListener('click', async ()=>{
+  if(!confirm('Vider complètement le GIST « retours-modifications.json » ?\nToutes les lignes de modifications terrain seront supprimées définitivement.')) return;
+  try{
+    let filename = localStorage.getItem(LS_FN_MOD);
+    if(!filename){
+      const first = await ghReadFirstFile(GIST_MODIF_ID);
+      filename = first.filename;
+      localStorage.setItem(LS_FN_MOD, filename);
+    }
+    await ghPatchFile(GIST_MODIF_ID, filename, JSON.stringify([]));
+    modifTable = [];
+    renderModifTable();
+    toast('GIST des modifications vidé avec succès','ok');
+  }catch(e){
+    toast(e.message,'err');
+  }
+});
+
+/* ======================================================================
+   PARAMETRES GITHUB
+   ====================================================================== */
+document.getElementById('btnSettings').addEventListener('click', ()=>{
+  document.getElementById('inputToken').value = localStorage.getItem(LS_TOKEN) || '';
+  document.getElementById('settingsStatus').textContent = '';
+  document.getElementById('settingsModal').classList.add('show');
+});
+document.getElementById('settingsModal').addEventListener('click', (e)=>{
+  if(e.target.id==='settingsModal') document.getElementById('settingsModal').classList.remove('show');
+});
+document.getElementById('btnSaveToken').addEventListener('click', ()=>{
+  localStorage.setItem(LS_TOKEN, document.getElementById('inputToken').value.trim());
+  document.getElementById('settingsModal').classList.remove('show');
+  toast('Jeton enregistré','ok');
+});
+document.getElementById('btnTestToken').addEventListener('click', async ()=>{
+  const status = document.getElementById('settingsStatus');
+  status.textContent = 'Test en cours…';
+  try{
+    const token = document.getElementById('inputToken').value.trim();
+    const res = await fetch('https://api.github.com/gists/'+GIST_DATA_ID, {headers:{'Authorization':'token '+token}});
+    status.textContent = res.ok ? '✓ Connexion valide' : '✗ Échec ('+res.status+')';
+  }catch(e){ status.textContent = '✗ '+e.message; }
+});
+
+/* ======================================================================
+   INITIALISATION
+   ====================================================================== */
+loadDataTable();
+</script>
+</body>
+</html>
