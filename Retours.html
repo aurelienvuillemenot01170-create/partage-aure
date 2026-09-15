@@ -326,7 +326,7 @@ const LS_FN_DATA   = 'retours_gist_data_filename';
 const LS_FN_MOD    = 'retours_gist_modif_filename';
 const LS_LOCAL_MOD = 'retours_local_modifications';
 const LS_DATA_CACHE= 'retours_local_data_cache';
-const DEFAULT_DEV_TOKEN = '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'; // jeton de développement, à remplacer avant mise en production
+const DEFAULT_DEV_TOKEN = 'ghp_mMLFagHfmwUu4JWxM3yYHRqKhsulsb39QhUr'; // jeton de développement, à remplacer avant mise en production
 if(!localStorage.getItem(LS_TOKEN)) localStorage.setItem(LS_TOKEN, DEFAULT_DEV_TOKEN);
 
 let dataTable = [];        // référentiel article (lecture seule, depuis retours.json)
@@ -552,14 +552,14 @@ function renderTable(){
     scroll.appendChild(card);
   }
 
-  // double-clic sur le titre = suppression
+  // double-clic / double-tap sur le titre = suppression
   scroll.querySelectorAll('[data-role="titre"]').forEach(el=>{
-    el.addEventListener('dblclick', ()=> confirmDeleteRow(Number(el.closest('.rowcard').dataset.index)));
+    bindDoubleActivate(el, ()=> confirmDeleteRow(Number(el.closest('.rowcard').dataset.index)));
   });
 
-  // double-clic sur un champ = édition (simple clic = aucune action, pour éviter le clavier intempestif)
+  // double-clic / double-tap sur un champ = édition (clic simple = aucune action, pour éviter le clavier intempestif)
   scroll.querySelectorAll('.ef-value').forEach(el=>{
-    el.addEventListener('dblclick', ()=> startFieldEdit(el));
+    bindDoubleActivate(el, ()=> startFieldEdit(el));
   });
 
   // mise en évidence + défilement vers la ligne concernée par un re-scan
@@ -604,10 +604,9 @@ function startFieldEdit(spanEl){
     isEditingField = false;
     updateInventaireCounter();
     renderTable();
-    // Après validation, aucun focus forcé sur un champ visible : le clavier
-    // logiciel reste fermé, mais on redonne le focus au champ caché pour que
-    // la douchette redevienne active immédiatement.
-    refocusScanCapture();
+    // On force le focus immédiat sur le champ de capture pour que la douchette
+    // redevienne active tout de suite (force=true contourne le délai anti-rebond).
+    refocusScanCapture(true);
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e)=>{
@@ -765,11 +764,21 @@ function onScanValue(ean){
    d'intercepter les touches au niveau du document. */
 const scannerCaptureEl = document.getElementById('scannerCapture');
 
-function refocusScanCapture(){
-  if(isEditingField
-     || document.getElementById('settingsModal').classList.contains('show')
-     || document.getElementById('searchModal').classList.contains('show')
-     || document.getElementById('camModal').classList.contains('show')) return;
+let lastTouchTime = 0;
+
+function refocusScanCapture(force){
+  if(isEditingField) return;
+  // Jamais de vol de focus tant qu'une fenêtre modale est ouverte
+  for(const id of ['settingsModal','searchModal','camModal','confirmModal']){
+    if(document.getElementById(id).classList.contains('show')) return;
+  }
+  // Ne pas voler le focus d'un champ ou d'un bouton déjà focalisé
+  const ae = document.activeElement;
+  if(ae && ae !== document.body && ae !== scannerCaptureEl
+     && ['INPUT','TEXTAREA','SELECT','BUTTON'].includes(ae.tagName)) return;
+  // Ne pas reprendre le focus juste après un tap tactile : sur le TC52 ce
+  // "rebond" de focus empêchait le clic de se terminer correctement.
+  if(!force && Date.now() - lastTouchTime < 500) return;
   try{ scannerCaptureEl.focus({preventScroll:true}); }catch(e){}
 }
 scannerCaptureEl.addEventListener('blur', ()=> setTimeout(refocusScanCapture, 30));
@@ -777,17 +786,38 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refocus
 window.addEventListener('focus', refocusScanCapture);
 refocusScanCapture();
 
-// Empêche un tap sur autre chose qu'un vrai champ de saisie de faire perdre
-// le focus à #scannerCapture (et donc de rouvrir/fermer le clavier sans
-// cesse). Seul "mousedown" est utilisé : un preventDefault() sur "touchstart"
-// annule aussi l'événement "click" qui suit sur mobile (c'était le bug qui
-// rendait le bouton OK de la fenêtre de confirmation inopérant).
-function guardFocus(e){
-  if(!e.target.closest('input, textarea, select')){
-    e.preventDefault();
-  }
+// CORRECTION : on ne bloque PLUS les interactions. L'ancien guardFocus appelait
+// preventDefault() sur tous les mousedown hors champs de saisie, ce qui rendait
+// inopérants les boutons (R.A.Z., Envoyer, ⚙, SCAN, OK/Annuler), la case
+// "Mode inventaire" et les cartes de recherche. On se contente de mémoriser
+// les taps tactiles pour que refocusScanCapture() ne reprenne pas le focus
+// dans les 500 ms qui suivent un tap.
+document.addEventListener('touchstart', ()=>{ lastTouchTime = Date.now(); }, {passive:true});
+
+/* Double activation : dblclick (souris) ou double-tap (tactile). Le simple
+   tap reste sans action pour éviter d'ouvrir le clavier par accident pendant
+   les scans. */
+function bindDoubleActivate(el, handler){
+  el.addEventListener('dblclick', handler);
+  let lastTap = 0, startX = 0, startY = 0;
+  el.addEventListener('touchstart', (e)=>{
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+  }, {passive:true});
+  el.addEventListener('touchend', (e)=>{
+    const t = e.changedTouches[0];
+    // Un geste de scroll/drag ne compte pas comme un tap
+    if(Math.hypot(t.clientX - startX, t.clientY - startY) > 12){ lastTap = 0; return; }
+    const now = Date.now();
+    if(now - lastTap < 350){
+      e.preventDefault(); // évite la synthèse de clic après le second tap
+      lastTap = 0;
+      handler(e);
+    } else {
+      lastTap = now;
+    }
+  });
 }
-document.addEventListener('mousedown', guardFocus, true);
 
 let scanDebounce = null;
 function processScanCaptureValue(){
