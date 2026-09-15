@@ -212,6 +212,13 @@
 </style>
 </head>
 <body>
+<!-- Champ invisible en permanence "focus" : sur les terminaux Zebra/Android,
+     la douchette (mode clavier / DataWedge) ne délivre ses frappes à la page
+     web que si un champ de saisie a réellement le focus. inputmode="none"
+     empêche le clavier logiciel de s'afficher malgré ce focus. -->
+<input id="scannerCapture" type="text" inputmode="none" autocomplete="off" autocorrect="off"
+       autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1"
+       style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;pointer-events:none;">
 
   <div class="appbar">
     <h1>Retours — Terrain</h1>
@@ -267,7 +274,7 @@
   <div class="search-modal" id="searchModal">
     <div class="search-header">
       <div class="search-input-wrap">
-        <input type="text" id="searchInput" placeholder="Rechercher un article, EAN, magasin…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <input type="text" id="searchInput" placeholder="Rechercher un article, EAN, magasin…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
         <button class="search-close" id="searchClose" aria-label="Fermer">✕</button>
       </div>
       <div class="search-actions">
@@ -295,8 +302,18 @@
     <div class="modal">
       <h3 style="margin-top:0;">Connexion GitHub</h3>
       <p>Jeton d'accès personnel (scope <code>gist</code>), nécessaire pour envoyer les modifications.</p>
-      <input type="password" id="inputToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <!-- Formulaire isolé + attributs anti-autofill : sans cela, les
+           navigateurs (Chrome/Android en particulier) associent le champ
+           texte visible précédent (la recherche) comme "identifiant" du
+           champ password, et peuvent mélanger/réinjecter les deux valeurs. -->
+      <form autocomplete="off" onsubmit="return false;">
+        <input type="text" name="prevent_autofill_username" autocomplete="off" tabindex="-1" aria-hidden="true"
+               style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+        <input type="password" id="inputToken" name="gh-pat-field" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+               autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
+      </form>
       <div class="actions">
+        <button class="btn-cancel" id="btnClearToken" style="margin-right:auto;">Effacer</button>
         <button class="btn-cancel" id="btnCloseSettings">Fermer</button>
         <button class="btn-confirm ok" id="btnSaveToken">Enregistrer</button>
       </div>
@@ -592,7 +609,10 @@ function startFieldEdit(spanEl){
     isEditingField = false;
     updateInventaireCounter();
     renderTable();
-    // Après validation, aucun focus forcé : le clavier reste fermé.
+    // Après validation, aucun focus forcé sur un champ visible : le clavier
+    // logiciel reste fermé, mais on redonne le focus au champ caché pour que
+    // la douchette redevienne active immédiatement.
+    refocusScanCapture();
   };
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', (e)=>{
@@ -752,6 +772,26 @@ function resetScanBuffer(){
   if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
 }
 
+const scannerCaptureEl = document.getElementById('scannerCapture');
+
+// Sur PC/Mac, un clavier physique (ou une douchette en USB) envoie ses
+// événements au document même sans focus particulier. Sur les terminaux
+// Zebra/Android en revanche, il faut un champ effectivement focus pour que
+// les frappes de la douchette (DataWedge / HID) atteignent la page. On garde
+// donc #scannerCapture focus en permanence, sauf pendant l'édition d'un
+// champ réel ou quand une fenêtre modale est ouverte.
+function refocusScanCapture(){
+  if(isEditingField
+     || document.getElementById('settingsModal').classList.contains('show')
+     || document.getElementById('searchModal').classList.contains('show')
+     || document.getElementById('camModal').classList.contains('show')) return;
+  try{ scannerCaptureEl.focus({preventScroll:true}); }catch(e){}
+}
+scannerCaptureEl.addEventListener('blur', ()=> setTimeout(refocusScanCapture, 30));
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refocusScanCapture(); });
+window.addEventListener('focus', refocusScanCapture);
+refocusScanCapture();
+
 document.addEventListener('keydown', (e)=>{
   // Pendant l'édition d'un champ ou dans les paramètres / recherche, les
   // frappes doivent rester destinées au champ concerné.
@@ -760,9 +800,11 @@ document.addEventListener('keydown', (e)=>{
      || document.getElementById('searchModal').classList.contains('show')) return;
 
   // Ne pas intercepter les séquences tapées manuellement dans un éventuel
-  // champ texte/select. La douchette, elle, envoie uniquement des chiffres.
+  // champ texte/select réel. Le champ #scannerCapture, lui, reste autorisé :
+  // c'est justement lui qui reçoit les frappes de la douchette. La douchette
+  // n'envoie que des chiffres.
   const tag = (e.target && e.target.tagName || '').toLowerCase();
-  if(tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if((tag === 'input' || tag === 'textarea' || tag === 'select') && e.target !== scannerCaptureEl) return;
 
   if(/^\d$/.test(e.key)){
     e.preventDefault();
@@ -804,6 +846,7 @@ async function stopCamera(){
   if(instance){
     try{ await instance.stop(); instance.clear(); }catch(e){}
   }
+  refocusScanCapture();
 }
 document.getElementById('btnCamClose').addEventListener('click', stopCamera);
 
@@ -835,6 +878,7 @@ function openSearchModal(){
 function closeSearchModal(){
   document.getElementById('searchModal').classList.remove('show');
   try{ document.getElementById('searchInput').blur(); }catch(e){}
+  refocusScanCapture();
 }
 
 function renderSearchResults(query){
@@ -909,11 +953,26 @@ document.getElementById('btnSettings').addEventListener('click', ()=>{
 });
 document.getElementById('btnCloseSettings').addEventListener('click', ()=>{
   document.getElementById('settingsModal').classList.remove('show');
+  refocusScanCapture();
+});
+document.getElementById('btnClearToken').addEventListener('click', ()=>{
+  document.getElementById('inputToken').value = '';
+  localStorage.removeItem(LS_TOKEN);
+  toast('Jeton effacé','ok');
 });
 document.getElementById('btnSaveToken').addEventListener('click', ()=>{
-  localStorage.setItem(LS_TOKEN, document.getElementById('inputToken').value.trim());
+  const val = document.getElementById('inputToken').value.trim();
+  // Un jeton GitHub valide n'a jamais d'espace ni de saut de ligne : si on
+  // en trouve, c'est le signe d'un autofill/collage foireux (par ex. mélangé
+  // avec un texte de recherche). On bloque plutôt que d'enregistrer n'importe quoi.
+  if(/\s/.test(val)){
+    toast('Jeton invalide (contient un espace) : vérifiez qu\'il n\'a pas été mélangé avec autre chose','err');
+    return;
+  }
+  localStorage.setItem(LS_TOKEN, val);
   document.getElementById('settingsModal').classList.remove('show');
   toast('Jeton enregistré','ok');
+  refocusScanCapture();
 });
 
 /* ======================================================================
