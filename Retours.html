@@ -777,17 +777,17 @@ document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refocus
 window.addEventListener('focus', refocusScanCapture);
 refocusScanCapture();
 
-// Empêche les boutons et icônes de "voler" le focus au moment du clic, plutôt
-// que de le reprendre après coup, pour limiter les allers-retours de focus
-// (et donc les apparitions/disparitions du clavier) pendant l'usage normal.
+// Empêche un tap sur autre chose qu'un vrai champ de saisie de faire perdre
+// le focus à #scannerCapture (et donc de rouvrir/fermer le clavier sans
+// cesse). Seul "mousedown" est utilisé : un preventDefault() sur "touchstart"
+// annule aussi l'événement "click" qui suit sur mobile (c'était le bug qui
+// rendait le bouton OK de la fenêtre de confirmation inopérant).
 function guardFocus(e){
-  const target = e.target.closest('button, .gear-btn');
-  if(target && !e.target.closest('input, textarea, select')){
+  if(!e.target.closest('input, textarea, select')){
     e.preventDefault();
   }
 }
 document.addEventListener('mousedown', guardFocus, true);
-document.addEventListener('touchstart', guardFocus, {capture:true, passive:false});
 
 let scanDebounce = null;
 function processScanCaptureValue(){
