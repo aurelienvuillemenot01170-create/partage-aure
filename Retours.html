@@ -214,9 +214,14 @@
 <body>
 <!-- Champ invisible en permanence "focus" : sur les terminaux Zebra/Android,
      la douchette (mode clavier / DataWedge) ne délivre ses frappes à la page
-     web que si un champ de saisie a réellement le focus. inputmode="none"
-     empêche le clavier logiciel de s'afficher malgré ce focus. -->
-<input id="scannerCapture" type="text" inputmode="none" autocomplete="off" autocorrect="off"
+     web que si un champ de saisie a réellement le focus. Ce champ doit
+     rester un input NORMAL et éditable (ni "readonly", ni inputmode="none") :
+     ces deux attributs empêchent Chrome d'établir la connexion clavier et
+     bloquent aussi les frappes d'un clavier externe (douchette comprise), pas
+     seulement le clavier logiciel. On évite plutôt l'ouverture du clavier
+     virtuel en empêchant le focus de quitter ce champ au clic (cf. plus bas),
+     de sorte qu'il n'a jamais besoin d'être "repris" pendant un geste utilisateur. -->
+<input id="scannerCapture" type="text" autocomplete="off" autocorrect="off"
        autocapitalize="off" spellcheck="false" aria-hidden="true" tabindex="-1"
        style="position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;border:none;padding:0;margin:0;pointer-events:none;">
 
@@ -759,11 +764,11 @@ function onScanValue(ean){
 }
 
 /* ---------- Capture clavier (douchette Zebra, sans touche Entrée) ----------
-   IMPORTANT : on ne donne plus le focus à un champ caché. Cela empêchait le
-   clavier logiciel de s'ouvrir, mais provoquait justement son apparition au
-   moindre clic sur l'écran. La douchette est maintenant capturée directement
-   au niveau du document. Le scanner Zebra peut donc continuer à envoyer ses
-   chiffres comme des frappes clavier, sans focus particulier. */
+   IMPORTANT : la douchette (mode clavier / DataWedge) n'envoie ses frappes
+   qu'à l'élément qui a effectivement le focus. #scannerCapture (défini juste
+   après <body>) reste focus en permanence sur l'écran principal pour les
+   recevoir ; voir plus bas comment on évite que le clavier logiciel ne
+   s'ouvre pour autant. */
 let scanBuffer = '';
 let scanTimer = null;
 
@@ -791,6 +796,24 @@ scannerCaptureEl.addEventListener('blur', ()=> setTimeout(refocusScanCapture, 30
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refocusScanCapture(); });
 window.addEventListener('focus', refocusScanCapture);
 refocusScanCapture();
+
+// Empêche les boutons et icônes de "voler" le focus au moment du clic, plutôt
+// que de le reprendre après coup. C'est cette reprise après coup (dans un
+// gestionnaire déclenché par un vrai geste utilisateur) qui provoquait
+// l'ouverture du clavier logiciel dans l'ancienne version. En bloquant le
+// focus dès le mousedown/touchstart sur ces éléments, #scannerCapture ne
+// perd jamais vraiment le focus pendant l'usage normal de l'écran principal,
+// et le clavier n'a donc jamais l'occasion de se rouvrir.
+function guardFocus(e){
+  const target = e.target.closest('button, .gear-btn');
+  // On ne touche jamais aux vrais champs de saisie (recherche, token, édition
+  // d'une ligne) : ceux-là doivent recevoir le focus normalement.
+  if(target && !e.target.closest('input, textarea, select')){
+    e.preventDefault();
+  }
+}
+document.addEventListener('mousedown', guardFocus, true);
+document.addEventListener('touchstart', guardFocus, {capture:true, passive:false});
 
 document.addEventListener('keydown', (e)=>{
   // Pendant l'édition d'un champ ou dans les paramètres / recherche, les
