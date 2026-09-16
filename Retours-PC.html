@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --ink:#16232B;
@@ -110,13 +111,23 @@
   }
   .btn-send:hover{filter:brightness(1.04);}
   .btn-send:active{box-shadow:0 1px 0 #A6690F;transform:translateY(2px) scale(.99);}
-  .btn-danger-ghost{background:transparent;color:var(--danger);border:1px solid var(--danger-soft);}
-  .btn-danger-ghost:hover{background:var(--danger-soft);}
   .btn-print{background:var(--ink);color:#fff;}
+  .btn-excel{background:var(--success);color:#fff;}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-danger:hover{filter:brightness(0.92);}
 
   .top-actions{
     display:flex;justify-content:flex-end;gap:10px;padding:14px 28px 0;
   }
+
+  /* ---------- Selectors ---------- */
+  .selector-group{display:flex;flex-direction:column;gap:5px;min-width:220px;}
+  .selector-group label{font-size:.78rem;font-weight:600;color:var(--ink-soft);letter-spacing:.2px;}
+  .selector-group select{
+    padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:.9rem;
+    background:#FBFCFB;color:var(--ink);font-family:inherit;
+  }
+  .selector-group select:focus{outline:none;border-color:var(--brand);background:#fff;}
 
   /* ---------- Table shell ---------- */
   .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--radius);max-height:62vh;background:#fff;}
@@ -134,22 +145,36 @@
   .th-controls select{
     font-size:.68rem;border-radius:5px;border:none;padding:2px 4px;color:var(--ink);
   }
-  .filter-row td{background:#F5F8F7;padding:5px 8px;border-bottom:1px solid var(--line);}
-  .filter-row input{
+  .filter-row td{
+    background:#F5F8F7;padding:5px 8px;border-bottom:1px solid var(--line);
+    vertical-align:top;
+  }
+  .filter-row input[type=text]{
     width:100%;border:1px solid var(--line);border-radius:6px;padding:5px 7px;font-size:.78rem;
   }
+  .filter-nonempty{
+    display:flex;align-items:center;gap:4px;font-size:.72rem;color:var(--ink-soft);
+    margin-top:4px;cursor:pointer;user-select:none;
+  }
+  .filter-nonempty input{margin:0;}
   tbody td{padding:8px 10px;border-bottom:1px solid #EEF1EC;vertical-align:middle;color:var(--ink);}
   tbody tr:hover{background:#F7FAF9;}
   .col-dragover{background:var(--amber-soft) !important;}
   .barcode-cell{display:flex;flex-direction:column;align-items:flex-start;gap:2px;}
   .barcode-cell svg{max-height:34px;}
   .barcode-caption{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--ink-soft);}
+
+  /* Colonne action / suppression */
+  th.action-col{width:56px;}
+  th.action-col .th-inner{cursor:default;}
+  td.action-cell{text-align:center;width:56px;}
   .row-delete-btn{
-    border:none;background:transparent;color:var(--ink-soft);cursor:pointer;
-    font-size:1rem;padding:4px 8px;border-radius:6px;transition:background .12s,color .12s;
+    background:transparent;border:1px solid transparent;border-radius:6px;
+    padding:4px 7px;font-size:1rem;line-height:1;color:var(--danger);
+    cursor:pointer;transition:background .15s, border-color .15s;
   }
-  .row-delete-btn:hover{background:var(--danger-soft);color:var(--danger);}
-  .th-actions{text-align:center;}
+  .row-delete-btn:hover{background:var(--danger-soft);border-color:var(--danger);}
+  .row-delete-btn:active{transform:scale(.92);}
 
   .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:600;}
   .badge-new{background:var(--success-soft);color:var(--success);}
@@ -184,9 +209,10 @@
   .modal .status-line{font-size:.8rem;margin-top:10px;color:var(--ink-soft);}
 
   @media print{
-    .appbar,.tabbar,.top-actions,.card.no-print,#toast,.modal-back,.filter-row,.th-controls,.gear-btn,.th-actions,.row-delete-btn{display:none !important;}
-    thead th.th-actions, tbody td:last-child{display:none !important;}
+    .appbar,.tabbar,.top-actions,.card.no-print,#toast,.modal-back,.filter-row,.th-controls,.gear-btn{display:none !important;}
+    .action-col, .action-cell{display:none !important;}
     body{background:#fff;}
+    .panel{padding:0;}
     .table-wrap{max-height:none;border:none;overflow:visible;}
     thead th{position:static;background:#fff !important;color:#000 !important;border-bottom:2px solid #000;}
     .th-label{color:#000;}
@@ -210,6 +236,7 @@
   <div class="tabbar">
     <div class="tab active" data-tab="donnees">Données</div>
     <div class="tab" data-tab="modifications">Modifications</div>
+    <div class="tab" data-tab="inventaire">Inventaire</div>
   </div>
 
   <!-- ===================== ONGLET DONNEES ===================== -->
@@ -232,10 +259,7 @@
           <h2 style="margin-bottom:2px;">Table article consolidée</h2>
           <p class="hint" style="margin-bottom:0;">Clé de fusion : N° Article + Code Magasin + Emplace. Un nouveau collage remplace la ligne existante si la clé correspond déjà.</p>
         </div>
-        <div class="row" style="margin-top:0;">
-          <button class="btn btn-send" id="btnSend">Envoyer vers le GIST</button>
-          <button class="btn btn-danger-ghost" id="btnEmptyGist">Vider le GIST</button>
-        </div>
+        <button class="btn btn-send" id="btnSend">Envoyer vers le GIST</button>
       </div>
       <div class="table-wrap" style="margin-top:14px;">
         <table id="dataTable">
@@ -262,12 +286,13 @@
       <div class="row" style="justify-content:space-between;margin-top:0;">
         <div>
           <h2 style="margin-bottom:2px;">Table des modifications terrain</h2>
-          <p class="hint" style="margin-bottom:0;">Chargée automatiquement depuis le GIST « retours-modifications.json ». Triez, filtrez, réordonnez les colonnes par glisser-déposer, puis activez l'encodage code-barre par colonne avant impression.</p>
+          <p class="hint" style="margin-bottom:0;">Chargée automatiquement depuis le GIST « retours-modifications.json ». Les colonnes « Nouvel emplacement » et « Nouvelle quantité » restent vides si la modification n'apporte aucun changement par rapport à l'existant.</p>
         </div>
         <div class="row" style="margin-top:0;">
           <button class="btn btn-ghost" id="btnRefreshModif">↻ Actualiser</button>
+          <button class="btn btn-excel" id="btnExportModif">⬇ Export Excel</button>
+          <button class="btn btn-danger btn-clear-modif" id="btnClearModifGist">🗑 Vider le GIST modif.</button>
           <button class="btn btn-print" id="btnPrint">Imprimer</button>
-          <button class="btn btn-danger-ghost" id="btnEmptyModifGist">Vider le GIST</button>
         </div>
       </div>
       <div class="row">
@@ -286,20 +311,60 @@
     </div>
   </div>
 
-  <div id="toast"></div>
+  <!-- ===================== ONGLET INVENTAIRE ===================== -->
+  <div class="panel" id="panel-inventaire">
+    <div class="card no-print">
+      <h2>Constituer un inventaire</h2>
+      <p class="hint">Choisissez un magasin et un emplacement à partir du référentiel article (GIST « retours.json »). Le tableau croise les articles du référentiel avec la table des modifications (clé : EAN + magasin + emplacement). Si aucune modification n'existe pour un article, sa <b>nouvelle quantité est fixée à 0</b> (article non compté sur le terrain). Si une modification existe mais n'apporte aucun changement effectif, la <b>nouvelle quantité reste vide</b>.</p>
+      <div class="row" style="margin-top:10px;">
+        <div class="selector-group">
+          <label for="selInvMagasin">Magasin</label>
+          <select id="selInvMagasin"></select>
+        </div>
+        <div class="selector-group">
+          <label for="selInvEmplacement">Emplacement</label>
+          <select id="selInvEmplacement"></select>
+        </div>
+        <div class="selector-group" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" id="btnGenInventaire">Générer l'inventaire</button>
+        </div>
+        <div class="selector-group" style="justify-content:flex-end;">
+          <label>&nbsp;</label>
+          <button class="btn btn-ghost" id="btnReloadInv">↻ Recharger les données</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="stat">Lignes de l'inventaire : <b id="statInvCount">0</b></div>
+        <div class="stat" id="statInvInfo">Aucun inventaire généré</div>
+      </div>
+    </div>
 
-  <!-- Modal choix envoi : remplacer ou ajouter -->
-  <div class="modal-back" id="sendModal">
-    <div class="modal">
-      <h3>Envoyer vers le GIST</h3>
-      <p class="hint" style="margin-top:-6px;" id="sendModalText"></p>
-      <div class="actions" style="justify-content:flex-start;flex-wrap:wrap;">
-        <button class="btn btn-ghost" id="sendCancel">Annuler</button>
-        <button class="btn btn-ghost" id="sendAppend" style="border-color:var(--brand);color:var(--brand-dark);">Ajouter au GIST existant</button>
-        <button class="btn btn-primary" id="sendReplace" style="background:var(--danger);">Remplacer entièrement le GIST</button>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-top:0;">
+        <div>
+          <h2 style="margin-bottom:2px;">Table inventaire</h2>
+          <p class="hint" style="margin-bottom:0;">Mêmes fonctionnalités que l'onglet Modifications : tri, filtres, réorganisation des colonnes, encodage code-barre, impression et export Excel.</p>
+        </div>
+        <div class="row" style="margin-top:0;">
+          <button class="btn btn-excel" id="btnExportInv">⬇ Export Excel</button>
+          <button class="btn btn-danger btn-clear-modif" id="btnClearModifGistInv">🗑 Vider le GIST modif.</button>
+          <button class="btn btn-print" id="btnPrintInv">Imprimer</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table id="invTable">
+          <thead>
+            <tr id="invHeadRow"></tr>
+            <tr class="filter-row" id="invFilterRow"></tr>
+          </thead>
+          <tbody id="invTableBody"></tbody>
+        </table>
       </div>
     </div>
   </div>
+
+  <div id="toast"></div>
 
   <!-- Modal paramètres -->
   <div class="modal-back" id="settingsModal">
@@ -322,31 +387,37 @@
    ====================================================================== */
 const GIST_DATA_ID  = 'b9a88af354ce71fc0f6bdb304203c650';   // retours.json
 const GIST_MODIF_ID = '34b4d14fff9969bd8c730b70d819168b';   // retours-modifications.json
-const LS_TOKEN   = 'retours_gh_token';
-const LS_FN_DATA = 'retours_gist_data_filename';
-const LS_FN_MOD  = 'retours_gist_modif_filename';
-const DEFAULT_DEV_TOKEN = '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'; // jeton de développement, à remplacer avant mise en production
-if(!localStorage.getItem(LS_TOKEN)) localStorage.setItem(LS_TOKEN, DEFAULT_DEV_TOKEN);
+const LS_TOKEN   = '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';
+const LS_FN_DATA = 'retours.json';
+const LS_FN_MOD  = 'retours-modifications.json';
 
 const DATA_COLS  = ['article','ean13','titre','magasin','emplace','stock'];
+
 const MODIF_COLS = [
   {key:'article', label:'N° Article'},
   {key:'ean13', label:'Ean13'},
   {key:'titre', label:'Titre'},
   {key:'magasin', label:'Magasin'},
   {key:'emplacement', label:'Emplacement'},
-  {key:'stock', label:'Stock'},
+  {key:'quantite', label:'Quantité'},
   {key:'nouvelEmplacement', label:'Nouvel emplacement'},
-  {key:'nouveauStock', label:'Nouveau stock'},
+  {key:'nouveauStock', label:'Nouvelle quantité'},
 ];
 
-let dataTable = [];      // référentiel article consolidé (envoyé vers retours.json)
-let pendingRows = [];    // lignes fraîchement collées, pas encore envoyées
-let modifTable = [];     // table des modifications (lecture seule ici)
-let modifColumnOrder = MODIF_COLS.map(c=>c.key);
-let modifSort = {key:null, dir:1};
-let modifFilters = {};
-let modifEncodeState = {}; // {key: {enabled:bool, touche:'aucune'|'enter'|'tab'}}
+const INVENTAIRE_COLS = [
+  {key:'article', label:'N° Article'},
+  {key:'ean13', label:'Ean13'},
+  {key:'titre', label:'Titre'},
+  {key:'magasin', label:'Magasin'},
+  {key:'emplacement', label:'Emplacement'},
+  {key:'nouvelEmplacement', label:'Nouvel emplacement'},
+  {key:'quantite', label:'Quantité'},
+  {key:'nouvelleQuantite', label:'Nouvelle quantité'},
+];
+
+let dataTable = [];
+let pendingRows = [];
+let modifTable = [];
 
 /* ======================================================================
    UTILITAIRES UI
@@ -367,6 +438,18 @@ function safeParseArray(content){
   if(Array.isArray(parsed)) return parsed;
   if(parsed && typeof parsed === 'object') return Object.values(parsed);
   return [];
+}
+function sortFr(a,b){
+  return String(a??'').localeCompare(String(b??''),'fr',{numeric:true});
+}
+function excelValue(v){
+  if(v === null || v === undefined || v === '') return '';
+  const s = String(v).trim();
+  if(/^-?\d+([.,]\d+)?$/.test(s)) return Number(s.replace(',','.'));
+  return s;
+}
+function sameValue(a, b){
+  return String(a ?? '').trim() === String(b ?? '').trim();
 }
 
 /* ======================================================================
@@ -411,6 +494,381 @@ async function ghPatchFile(gistId, filename, content){
 }
 
 /* ======================================================================
+   COMPOSANT GENERIQUE — vue de tableau
+   ====================================================================== */
+function createTableView(cfg){
+  const view = {
+    cols: cfg.cols,
+    rows: [],
+    columnOrder: cfg.cols.map(c=>c.key),
+    sort: {key:null, dir:1},
+    filters: {},
+    nonEmptyActive: {},
+    nonEmptyFilters: new Set(cfg.nonEmptyFilters || []),
+    encodeState: {},
+    prefix: cfg.prefix,
+    headRow: document.getElementById(cfg.headRowId),
+    filterRow: document.getElementById(cfg.filterRowId),
+    body: document.getElementById(cfg.bodyId),
+    countEl: cfg.countId ? document.getElementById(cfg.countId) : null,
+    onDelete: cfg.onDelete || null,
+    deleteTitle: cfg.deleteTitle || 'Supprimer cette ligne',
+    getValue: cfg.getValue || ((row, key)=> row[key]),
+  };
+  view.cols.forEach(c=> view.encodeState[c.key] = {enabled:false, touche:'aucune'});
+
+  view.labelOf = function(key){ return view.cols.find(c=>c.key===key).label; };
+
+  view.getDisplayedRows = function(){
+    let rows = view.rows.slice();
+    for(const key in view.filters){
+      const v = (view.filters[key]||'').toLowerCase();
+      if(v) rows = rows.filter(r => String(view.getValue(r,key) ?? '').toLowerCase().includes(v));
+    }
+    for(const key in view.nonEmptyActive){
+      if(view.nonEmptyActive[key]){
+        rows = rows.filter(r => String(view.getValue(r,key) ?? '').trim() !== '');
+      }
+    }
+    if(view.sort.key){
+      const k = view.sort.key, d = view.sort.dir;
+      rows.sort((a,b)=> sortFr(view.getValue(a,k), view.getValue(b,k)) * d);
+    }
+    return rows;
+  };
+
+  view.renderHead = function(){
+    const headRow = view.headRow, filterRow = view.filterRow;
+    headRow.innerHTML = '';
+    filterRow.innerHTML = '';
+    for(const key of view.columnOrder){
+      const col = view.cols.find(c=>c.key===key);
+      const th = document.createElement('th');
+      th.draggable = true;
+      th.dataset.key = key;
+      const arrow = view.sort.key===key ? (view.sort.dir===1?'▲':'▼') : '';
+      th.innerHTML = `
+        <div class="th-inner">
+          <div class="th-label" data-sort="${key}">${col.label} <span class="sort-arrow">${arrow}</span></div>
+          <div class="th-controls">
+            <label><input type="checkbox" data-encode="${key}" ${view.encodeState[key].enabled?'checked':''}> Encoder</label>
+            <select data-touche="${key}">
+              <option value="aucune">Touche : Aucune</option>
+              <option value="enter">Touche : Entrée</option>
+              <option value="tab">Touche : Tabulation</option>
+            </select>
+          </div>
+        </div>`;
+      th.querySelector('[data-touche]').value = view.encodeState[key].touche;
+      headRow.appendChild(th);
+
+      const td = document.createElement('td');
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = 'Filtrer…';
+      input.dataset.filter = key;
+      input.value = view.filters[key] || '';
+      td.appendChild(input);
+      if(view.nonEmptyFilters.has(key)){
+        const lbl = document.createElement('label');
+        lbl.className = 'filter-nonempty';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.nonempty = key;
+        cb.checked = !!view.nonEmptyActive[key];
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(' non vide'));
+        td.appendChild(lbl);
+      }
+      filterRow.appendChild(td);
+    }
+
+    if(view.onDelete){
+      const th = document.createElement('th');
+      th.className = 'action-col';
+      th.innerHTML = `<div class="th-inner"><div class="th-label">🗑</div></div>`;
+      headRow.appendChild(th);
+      const td = document.createElement('td');
+      filterRow.appendChild(td);
+    }
+
+    headRow.querySelectorAll('[data-sort]').forEach(el=>{
+      el.style.cursor='pointer';
+      el.addEventListener('click', ()=>{
+        const k = el.dataset.sort;
+        if(view.sort.key===k) view.sort.dir *= -1; else { view.sort.key=k; view.sort.dir=1; }
+        view.renderHead(); view.renderBody();
+      });
+    });
+    headRow.querySelectorAll('[data-encode]').forEach(el=>{
+      el.addEventListener('click', (e)=>{ e.stopPropagation(); });
+      el.addEventListener('change', ()=>{
+        view.encodeState[el.dataset.encode].enabled = el.checked;
+        view.renderBody();
+      });
+    });
+    headRow.querySelectorAll('[data-touche]').forEach(el=>{
+      el.addEventListener('click', (e)=> e.stopPropagation());
+      el.addEventListener('change', ()=>{
+        view.encodeState[el.dataset.touche].touche = el.value;
+        view.renderBody();
+      });
+    });
+    filterRow.querySelectorAll('[data-filter]').forEach(el=>{
+      el.addEventListener('input', ()=>{
+        view.filters[el.dataset.filter] = el.value;
+        view.renderBody();
+      });
+    });
+    filterRow.querySelectorAll('[data-nonempty]').forEach(el=>{
+      el.addEventListener('change', ()=>{
+        view.nonEmptyActive[el.dataset.nonempty] = el.checked;
+        view.renderBody();
+      });
+    });
+    let dragKey = null;
+    headRow.querySelectorAll('th[data-key]').forEach(th=>{
+      th.addEventListener('dragstart', ()=>{ dragKey = th.dataset.key; });
+      th.addEventListener('dragover', (e)=>{ e.preventDefault(); th.classList.add('col-dragover'); });
+      th.addEventListener('dragleave', ()=> th.classList.remove('col-dragover'));
+      th.addEventListener('drop', ()=>{
+        th.classList.remove('col-dragover');
+        const targetKey = th.dataset.key;
+        if(dragKey && dragKey!==targetKey){
+          const from = view.columnOrder.indexOf(dragKey);
+          const to = view.columnOrder.indexOf(targetKey);
+          view.columnOrder.splice(from,1);
+          view.columnOrder.splice(to,0,dragKey);
+          view.renderHead(); view.renderBody();
+        }
+      });
+    });
+  };
+
+  view.renderBody = function(){
+    const rows = view.getDisplayedRows();
+    if(view.countEl) view.countEl.textContent = rows.length;
+    const tbody = view.body;
+    tbody.innerHTML = '';
+    rows.forEach((r,i)=>{
+      const tr = document.createElement('tr');
+      for(const key of view.columnOrder){
+        const td = document.createElement('td');
+        const val = view.getValue(r,key) ?? '';
+        const state = view.encodeState[key];
+        if(state && state.enabled && val !== ''){
+          const svgId = view.prefix+'_'+i+'_'+key;
+          td.innerHTML = `<div class="barcode-cell"><svg id="${svgId}"></svg><span class="barcode-caption">${val}</span></div>`;
+          tr.appendChild(td);
+          setTimeout(()=>{
+            let encoded = String(val);
+            if(state.touche==='enter') encoded += '\r';
+            if(state.touche==='tab') encoded += '\t';
+            try{
+              JsBarcode('#'+svgId, encoded, {format:'CODE128', displayValue:false, height:34, margin:2, width:1.4});
+            }catch(e){}
+          },0);
+        } else {
+          td.textContent = val;
+          tr.appendChild(td);
+        }
+      }
+      if(view.onDelete){
+        const td = document.createElement('td');
+        td.className = 'action-cell';
+        const btn = document.createElement('button');
+        btn.className = 'row-delete-btn';
+        btn.type = 'button';
+        btn.title = view.deleteTitle;
+        btn.setAttribute('aria-label', view.deleteTitle);
+        btn.textContent = '🗑';
+        btn.addEventListener('click', (e)=>{
+          e.stopPropagation();
+          view.onDelete(r);
+        });
+        td.appendChild(btn);
+        tr.appendChild(td);
+      }
+      tbody.appendChild(tr);
+    });
+  };
+
+  return view;
+}
+
+/* ======================================================================
+   EXPORT EXCEL
+   ====================================================================== */
+function exportViewToExcel(view, filename){
+  const rows = view.getDisplayedRows();
+  if(rows.length===0){ toast('Aucune ligne à exporter','err'); return; }
+  const headers = view.columnOrder.map(k=> view.labelOf(k));
+  const aoa = [headers, ...rows.map(r=> view.columnOrder.map(k=> excelValue(view.getValue(r,k))))];
+
+  if(window.XLSX){
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = view.columnOrder.map((k,i)=>{
+      let w = String(headers[i]).length;
+      rows.slice(0,300).forEach(r=>{
+        w = Math.max(w, String(view.getValue(r,k) ?? '').length);
+      });
+      return {wch: Math.min(w+2, 60)};
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Export');
+    XLSX.writeFile(wb, filename);
+    toast(rows.length + ' ligne(s) exportée(s) vers ' + filename, 'ok');
+  } else {
+    const csv = aoa.map(line =>
+      line.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')
+    ).join('\r\n');
+    const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename.replace(/\.xlsx$/i,'') + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('Librairie Excel indisponible : export CSV effectué', 'ok');
+  }
+}
+
+/* ======================================================================
+   HELPERS GIST MODIFICATIONS
+   ====================================================================== */
+async function getModifFilename(){
+  let filename = localStorage.getItem(LS_FN_MOD);
+  if(!filename){
+    const first = await ghReadFirstFile(GIST_MODIF_ID);
+    filename = first.filename;
+    localStorage.setItem(LS_FN_MOD, filename);
+  }
+  return filename;
+}
+
+async function saveModifTable(newTable, successMsg){
+  if(!localStorage.getItem(LS_TOKEN)){
+    toast('Jeton GitHub requis (⚙ Paramètres)','err');
+    return false;
+  }
+  try{
+    const filename = await getModifFilename();
+    await ghPatchFile(GIST_MODIF_ID, filename, JSON.stringify(newTable));
+    modifTable = newTable;
+    modifView.rows = modifTable;
+    modifView.renderBody();
+    toast(successMsg || 'Modifications enregistrées','ok');
+    return true;
+  }catch(e){
+    toast(e.message,'err');
+    return false;
+  }
+}
+
+async function clearModifGist(){
+  if(!localStorage.getItem(LS_TOKEN)){
+    toast('Jeton GitHub requis (⚙ Paramètres)','err');
+    return;
+  }
+  if(!confirm('Vider entièrement le GIST « retours-modifications.json » ?\n\nToutes les modifications terrain seront supprimées. Cette action est irréversible.')) return;
+  try{
+    const filename = await getModifFilename();
+    await ghPatchFile(GIST_MODIF_ID, filename, '[]');
+    modifTable = [];
+    modifView.rows = [];
+    modifView.renderBody();
+    invView.rows = [];
+    invView.renderBody();
+    document.getElementById('statInvInfo').textContent = 'Aucun inventaire généré';
+    toast('GIST des modifications vidé','ok');
+  }catch(e){
+    toast(e.message,'err');
+  }
+}
+
+/* ======================================================================
+   HELPERS MÉTIER
+   ====================================================================== */
+
+/* Quantité de référence portée par une ligne de modification :
+   on accepte 'quantite' ou 'stock'. */
+function modifRefQty(m){
+  if(!m) return '';
+  if(m.quantite !== undefined && m.quantite !== null && String(m.quantite).trim() !== '') return m.quantite;
+  if(m.stock !== undefined && m.stock !== null && String(m.stock).trim() !== '') return m.stock;
+  return '';
+}
+
+/* Nouvelle quantité pour la table MODIFICATIONS :
+   vide si absente ou identique à la référence (aucun changement). */
+function modifNewQtyDisplay(m){
+  if(!m) return '';
+  const nv = m.nouveauStock ?? m.nouvelleQuantite ?? '';
+  if(String(nv).trim() === '') return '';
+  const ref = modifRefQty(m);
+  if(String(ref).trim() === '') return nv;
+  return sameValue(nv, ref) ? '' : nv;
+}
+
+/* Nouvel emplacement pour la table MODIFICATIONS :
+   vide si absent ou identique à l'emplacement courant. */
+function modifNewEmplacementDisplay(m){
+  if(!m) return '';
+  const nv = m.nouvelEmplacement ?? '';
+  if(String(nv).trim() === '') return '';
+  return sameValue(nv, m.emplacement) ? '' : nv;
+}
+
+/* ======================================================================
+   INSTANCIATION DES VUES
+   ====================================================================== */
+const modifView = createTableView({
+  cols: MODIF_COLS,
+  prefix: 'bcm',
+  headRowId: 'modifHeadRow',
+  filterRowId: 'modifFilterRow',
+  bodyId: 'modifTableBody',
+  countId: 'statModifCount',
+  nonEmptyFilters: ['nouvelEmplacement','nouveauStock'],
+  getValue: (row, key)=>{
+    if(key === 'quantite')          return modifRefQty(row);
+    if(key === 'nouveauStock')      return modifNewQtyDisplay(row);       // étiquette « Nouvelle quantité »
+    if(key === 'nouvelEmplacement') return modifNewEmplacementDisplay(row);
+    return row[key] ?? '';
+  },
+  deleteTitle: 'Supprimer cette modification du GIST',
+  onDelete: async (row)=>{
+    if(!confirm('Supprimer définitivement cette ligne de modification du GIST ?')) return;
+    const filtered = modifTable.filter(r => r !== row);
+    await saveModifTable(filtered, 'Ligne supprimée du GIST');
+  },
+});
+
+const invView = createTableView({
+  cols: INVENTAIRE_COLS,
+  prefix: 'bci',
+  headRowId: 'invHeadRow',
+  filterRowId: 'invFilterRow',
+  bodyId: 'invTableBody',
+  countId: 'statInvCount',
+  nonEmptyFilters: ['nouvelEmplacement','nouvelleQuantite'],
+  deleteTitle: 'Supprimer la modification correspondante du GIST',
+  onDelete: async (row)=>{
+    const targetKey = `${row.ean13 ?? ''}||${row.magasin ?? ''}||${row.emplacement ?? ''}`;
+    const matching = modifTable.filter(m => modifCrossKey(m) === targetKey);
+    if(matching.length === 0){
+      toast('Aucune modification enregistrée pour cette ligne','err');
+      return;
+    }
+    if(!confirm(`Supprimer la modification du GIST pour l'article ${row.ean13 || row.article} (magasin ${row.magasin}, emplacement ${row.emplacement}) ?`)) return;
+    const filtered = modifTable.filter(m => modifCrossKey(m) !== targetKey);
+    const ok = await saveModifTable(filtered, 'Modification supprimée du GIST');
+    if(ok){
+      document.getElementById('btnGenInventaire').click();
+    }
+  },
+});
+
+/* ======================================================================
    ONGLETS
    ====================================================================== */
 document.querySelectorAll('.tab').forEach(tab=>{
@@ -421,6 +879,9 @@ document.querySelectorAll('.tab').forEach(tab=>{
     document.getElementById('panel-'+tab.dataset.tab).classList.add('active');
     if(tab.dataset.tab === 'modifications' && modifTable.length===0){
       loadModifTable();
+    }
+    if(tab.dataset.tab === 'inventaire'){
+      initInventaireTab();
     }
   });
 });
@@ -438,8 +899,8 @@ function parsePastedBlock(text){
   const rows = [];
   for(const line of lines){
     const cols = line.split('\t');
-    if(cols.length < 8) continue;          // ligne incomplète, ignorée
-    if(looksLikeHeader(cols)) continue;    // en-tête répétée, ignorée
+    if(cols.length < 8) continue;
+    if(looksLikeHeader(cols)) continue;
     rows.push({
       article: (cols[1]||'').trim(),
       ean13:   (cols[2]||'').trim(),
@@ -456,7 +917,6 @@ document.getElementById('btnAnalyse').addEventListener('click', ()=>{
   if(!text.trim()){ toast('Aucune donnée à analyser','err'); return; }
   const rows = parsePastedBlock(text);
   if(rows.length===0){ toast('Aucune ligne exploitable détectée (en-têtes ou format inattendu)','err'); return; }
-  // fusion sur pendingRows par clé
   const map = new Map(pendingRows.map(r=>[keyOf(r), r]));
   for(const r of rows) map.set(keyOf(r), r);
   pendingRows = Array.from(map.values());
@@ -493,44 +953,13 @@ function renderDataTable(){
   }
 }
 
-function askSendMode(pendingCount, existingCount){
-  return new Promise(resolve=>{
-    document.getElementById('sendModalText').textContent =
-      `${pendingCount} ligne(s) en attente / ${existingCount} ligne(s) déjà présentes dans le GIST. Voulez-vous ajouter (fusionner) ces lignes au contenu existant, ou remplacer entièrement le GIST par les seules lignes en attente ?`;
-    const modal = document.getElementById('sendModal');
-    modal.classList.add('show');
-    const btnReplace = document.getElementById('sendReplace');
-    const btnAppend = document.getElementById('sendAppend');
-    const btnCancel = document.getElementById('sendCancel');
-    const cleanup = (val)=>{
-      modal.classList.remove('show');
-      btnReplace.removeEventListener('click', onReplace);
-      btnAppend.removeEventListener('click', onAppend);
-      btnCancel.removeEventListener('click', onCancel);
-      resolve(val);
-    };
-    const onReplace = ()=>cleanup('replace');
-    const onAppend = ()=>cleanup('append');
-    const onCancel = ()=>cleanup(null);
-    btnReplace.addEventListener('click', onReplace);
-    btnAppend.addEventListener('click', onAppend);
-    btnCancel.addEventListener('click', onCancel);
-  });
-}
-
 document.getElementById('btnSend').addEventListener('click', async ()=>{
   if(pendingRows.length===0){ toast('Rien à envoyer','err'); return; }
-  const mode = await askSendMode(pendingRows.length, dataTable.length);
-  if(!mode) return;
+  if(!confirm(`Envoyer ${pendingRows.length} ligne(s) vers le GIST « retours.json » ?\nCela mettra à jour le référentiel partagé avec l'application terrain.`)) return;
   try{
-    let merged;
-    if(mode === 'replace'){
-      merged = pendingRows.slice();
-    } else {
-      const map = new Map(dataTable.map(r=>[keyOf(r), r]));
-      for(const r of pendingRows) map.set(keyOf(r), r);
-      merged = Array.from(map.values());
-    }
+    const map = new Map(dataTable.map(r=>[keyOf(r), r]));
+    for(const r of pendingRows) map.set(keyOf(r), r);
+    const merged = Array.from(map.values());
     let filename = localStorage.getItem(LS_FN_DATA);
     if(!filename){
       const first = await ghReadFirstFile(GIST_DATA_ID);
@@ -541,25 +970,7 @@ document.getElementById('btnSend').addEventListener('click', async ()=>{
     dataTable = merged;
     pendingRows = [];
     renderDataTable();
-    toast((mode==='replace' ? 'GIST remplacé' : 'Référentiel mis à jour') + ' avec succès ('+merged.length+' lignes)','ok');
-  }catch(e){
-    toast(e.message,'err');
-  }
-});
-
-document.getElementById('btnEmptyGist').addEventListener('click', async ()=>{
-  if(!confirm('Vider complètement le GIST « retours.json » ?\nToutes les données du référentiel seront supprimées définitivement. Les lignes en attente de collage ne seront pas affectées.')) return;
-  try{
-    let filename = localStorage.getItem(LS_FN_DATA);
-    if(!filename){
-      const first = await ghReadFirstFile(GIST_DATA_ID);
-      filename = first.filename;
-      localStorage.setItem(LS_FN_DATA, filename);
-    }
-    await ghPatchFile(GIST_DATA_ID, filename, JSON.stringify([]));
-    dataTable = [];
-    renderDataTable();
-    toast('GIST vidé avec succès','ok');
+    toast('Référentiel envoyé avec succès ('+merged.length+' lignes)','ok');
   }catch(e){
     toast(e.message,'err');
   }
@@ -580,8 +991,6 @@ async function loadDataTable(){
 /* ======================================================================
    ONGLET MODIFICATIONS
    ====================================================================== */
-MODIF_COLS.forEach(c=> modifEncodeState[c.key] = {enabled:false, touche:'aucune'});
-
 async function loadModifTable(){
   document.getElementById('statModifSync').textContent = 'Chargement…';
   try{
@@ -589,195 +998,156 @@ async function loadModifTable(){
     localStorage.setItem(LS_FN_MOD, filename);
     modifTable = safeParseArray(content);
     document.getElementById('statModifSync').textContent = 'Synchronisé à ' + new Date().toLocaleTimeString('fr-FR');
-    toast('Table des modifications actualisée','ok');
   }catch(e){
     modifTable = [];
     document.getElementById('statModifSync').textContent = 'Erreur de synchronisation';
     toast(e.message,'err');
   }
-  renderModifHead();
-  renderModifTable();
+  modifView.rows = modifTable;
+  modifView.renderHead();
+  modifView.renderBody();
 }
-document.getElementById('btnRefreshModif').addEventListener('click', loadModifTable);
-
-function renderModifHead(){
-  const headRow = document.getElementById('modifHeadRow');
-  const filterRow = document.getElementById('modifFilterRow');
-  headRow.innerHTML = '';
-  filterRow.innerHTML = '';
-  for(const key of modifColumnOrder){
-    const col = MODIF_COLS.find(c=>c.key===key);
-    const th = document.createElement('th');
-    th.draggable = true;
-    th.dataset.key = key;
-    const arrow = modifSort.key===key ? (modifSort.dir===1?'▲':'▼') : '';
-    th.innerHTML = `
-      <div class="th-inner">
-        <div class="th-label" data-sort="${key}">${col.label} <span class="sort-arrow">${arrow}</span></div>
-        <div class="th-controls">
-          <label><input type="checkbox" data-encode="${key}" ${modifEncodeState[key].enabled?'checked':''}> Encoder</label>
-          <select data-touche="${key}">
-            <option value="aucune">Touche : Aucune</option>
-            <option value="enter">Touche : Entrée</option>
-            <option value="tab">Touche : Tabulation</option>
-          </select>
-        </div>
-      </div>`;
-    th.querySelector('[data-touche]').value = modifEncodeState[key].touche;
-    headRow.appendChild(th);
-
-    const td = document.createElement('td');
-    td.innerHTML = `<input type="text" placeholder="Filtrer…" data-filter="${key}" value="${modifFilters[key]||''}">`;
-    filterRow.appendChild(td);
-  }
-  // Colonne fixe "Actions" (non triable, non déplaçable, non filtrable)
-  const thActions = document.createElement('th');
-  thActions.className = 'th-actions';
-  thActions.innerHTML = `<div class="th-inner"><div class="th-label">Actions</div></div>`;
-  headRow.appendChild(thActions);
-  filterRow.appendChild(document.createElement('td'));
-  // Tri au clic
-  headRow.querySelectorAll('[data-sort]').forEach(el=>{
-    el.style.cursor='pointer';
-    el.addEventListener('click', ()=>{
-      const k = el.dataset.sort;
-      if(modifSort.key===k) modifSort.dir *= -1; else { modifSort.key=k; modifSort.dir=1; }
-      renderModifHead(); renderModifTable();
-    });
-  });
-  // Encodage
-  headRow.querySelectorAll('[data-encode]').forEach(el=>{
-    el.addEventListener('click', (e)=>{ e.stopPropagation(); });
-    el.addEventListener('change', ()=>{
-      modifEncodeState[el.dataset.encode].enabled = el.checked;
-      renderModifTable();
-    });
-  });
-  headRow.querySelectorAll('[data-touche]').forEach(el=>{
-    el.addEventListener('click', (e)=> e.stopPropagation());
-    el.addEventListener('change', ()=>{
-      modifEncodeState[el.dataset.touche].touche = el.value;
-      renderModifTable();
-    });
-  });
-  // Filtres
-  filterRow.querySelectorAll('[data-filter]').forEach(el=>{
-    el.addEventListener('input', ()=>{
-      modifFilters[el.dataset.filter] = el.value;
-      renderModifTable();
-    });
-  });
-  // Glisser-déposer colonnes
-  let dragKey = null;
-  headRow.querySelectorAll('th[draggable="true"]').forEach(th=>{
-    th.addEventListener('dragstart', ()=>{ dragKey = th.dataset.key; });
-    th.addEventListener('dragover', (e)=>{ e.preventDefault(); th.classList.add('col-dragover'); });
-    th.addEventListener('dragleave', ()=> th.classList.remove('col-dragover'));
-    th.addEventListener('drop', ()=>{
-      th.classList.remove('col-dragover');
-      const targetKey = th.dataset.key;
-      if(dragKey && dragKey!==targetKey){
-        const from = modifColumnOrder.indexOf(dragKey);
-        const to = modifColumnOrder.indexOf(targetKey);
-        modifColumnOrder.splice(from,1);
-        modifColumnOrder.splice(to,0,dragKey);
-        renderModifHead(); renderModifTable();
-      }
-    });
-  });
-}
-
-function renderModifTable(){
-  let rows = modifTable.slice();
-  for(const key in modifFilters){
-    const v = (modifFilters[key]||'').toLowerCase();
-    if(v) rows = rows.filter(r => String(r[key]??'').toLowerCase().includes(v));
-  }
-  if(modifSort.key){
-    rows.sort((a,b)=>{
-      const av = String(a[modifSort.key]??''), bv = String(b[modifSort.key]??'');
-      return av.localeCompare(bv,'fr',{numeric:true}) * modifSort.dir;
-    });
-  }
-  document.getElementById('statModifCount').textContent = rows.length;
-  const tbody = document.getElementById('modifTableBody');
-  tbody.innerHTML = '';
-  rows.forEach((r,i)=>{
-    const tr = document.createElement('tr');
-    for(const key of modifColumnOrder){
-      const td = document.createElement('td');
-      const val = r[key] ?? '';
-      const state = modifEncodeState[key];
-      if(state && state.enabled && val !== ''){
-        const svgId = 'bc_'+i+'_'+key;
-        td.innerHTML = `<div class="barcode-cell"><svg id="${svgId}"></svg><span class="barcode-caption">${val}</span></div>`;
-        tr.appendChild(td);
-        setTimeout(()=>{
-          let encoded = String(val);
-          if(state.touche==='enter') encoded += '\r';
-          if(state.touche==='tab') encoded += '\t';
-          try{
-            JsBarcode('#'+svgId, encoded, {format:'CODE128', displayValue:false, height:34, margin:2, width:1.4});
-          }catch(e){ /* valeur non encodable, cellule laissée vide */ }
-        },0);
-      } else {
-        td.textContent = val;
-        tr.appendChild(td);
-      }
-    }
-    // Colonne actions : suppression contextuelle de la ligne
-    const tdActions = document.createElement('td');
-    tdActions.style.textAlign = 'center';
-    const delBtn = document.createElement('button');
-    delBtn.className = 'row-delete-btn';
-    delBtn.title = 'Supprimer cette ligne';
-    delBtn.innerHTML = '🗑';
-    delBtn.addEventListener('click', ()=> deleteModifRow(r));
-    tdActions.appendChild(delBtn);
-    tr.appendChild(tdActions);
-    tbody.appendChild(tr);
-  });
-}
-
-async function deleteModifRow(row){
-  if(!confirm(`Supprimer cette ligne ?\n${row.titre || row.article} (Art. ${row.article})`)) return;
-  const idx = modifTable.indexOf(row);
-  if(idx === -1) return;
-  modifTable.splice(idx, 1);
-  renderModifTable();
-  try{
-    let filename = localStorage.getItem(LS_FN_MOD);
-    if(!filename){
-      const first = await ghReadFirstFile(GIST_MODIF_ID);
-      filename = first.filename;
-      localStorage.setItem(LS_FN_MOD, filename);
-    }
-    await ghPatchFile(GIST_MODIF_ID, filename, JSON.stringify(modifTable));
-    toast('Ligne supprimée du GIST','ok');
-  }catch(e){
-    toast('Suppression locale seulement : '+e.message,'err');
-  }
-}
-
+document.getElementById('btnRefreshModif').addEventListener('click', async ()=>{
+  await loadModifTable();
+  toast('Table des modifications actualisée','ok');
+});
+document.getElementById('btnExportModif').addEventListener('click', ()=>{
+  exportViewToExcel(modifView, 'retours-modifications.xlsx');
+});
 document.getElementById('btnPrint').addEventListener('click', ()=> window.print());
 
-document.getElementById('btnEmptyModifGist').addEventListener('click', async ()=>{
-  if(!confirm('Vider complètement le GIST « retours-modifications.json » ?\nToutes les lignes de modifications terrain seront supprimées définitivement.')) return;
-  try{
-    let filename = localStorage.getItem(LS_FN_MOD);
-    if(!filename){
-      const first = await ghReadFirstFile(GIST_MODIF_ID);
-      filename = first.filename;
-      localStorage.setItem(LS_FN_MOD, filename);
-    }
-    await ghPatchFile(GIST_MODIF_ID, filename, JSON.stringify([]));
-    modifTable = [];
-    renderModifTable();
-    toast('GIST des modifications vidé avec succès','ok');
-  }catch(e){
-    toast(e.message,'err');
-  }
+document.querySelectorAll('.btn-clear-modif').forEach(btn=>{
+  btn.addEventListener('click', clearModifGist);
 });
+
+/* ======================================================================
+   ONGLET INVENTAIRE
+   ====================================================================== */
+function modifCrossKey(m){
+  const pos = (m.nouvelEmplacement && String(m.nouvelEmplacement).trim() !== '')
+    ? String(m.nouvelEmplacement).trim()
+    : String(m.emplacement??'').trim();
+  return `${m.ean13 ?? m.article ?? ''}||${m.magasin ?? ''}||${pos}`;
+}
+function dataCrossKey(d){
+  return `${d.ean13 ?? ''}||${d.magasin ?? ''}||${d.emplace ?? ''}`;
+}
+
+/* Règles pour la table inventaire :
+   - Article NON présent dans « modifications »            → nouvelleQuantite = '0'
+   - Article présent + nouvelle quantité ≠ quantité        → nouvelleQuantite = valeur
+   - Article présent + nouvelle quantité == quantité       → nouvelleQuantite = '' (vide)
+   - Article présent + nouvel emplacement ≠ emplacement    → nouvelEmplacement = valeur
+   - Article présent + nouvel emplacement == emplacement   → nouvelEmplacement = '' (vide)
+*/
+function buildInventaireRows(magasin, emplacement){
+  const modifMap = new Map();
+  for(const m of modifTable){
+    modifMap.set(modifCrossKey(m), m);
+  }
+  const rows = [];
+  for(const d of dataTable){
+    if(String(d.magasin) !== String(magasin)) continue;
+    if(emplacement && String(d.emplace) !== String(emplacement)) continue;
+
+    const m = modifMap.get(dataCrossKey(d)) || null;
+
+    // Quantité de référence affichée dans la colonne « Quantité ».
+    const qteRefFromModif = modifRefQty(m);
+    const quantiteRef = (qteRefFromModif !== '') ? qteRefFromModif : (d.stock ?? '');
+
+    let nouvelleQuantite;
+    let nouvelEmplacement = '';
+
+    if(!m){
+      // Aucune ligne dans le GIST modifications → article non compté = 0
+      nouvelleQuantite = '0';
+    } else {
+      // Ligne existante : on n'affiche QUE si la valeur change réellement.
+      const newQ = m.nouveauStock ?? m.nouvelleQuantite ?? '';
+      if(String(newQ).trim() !== '' && !sameValue(newQ, quantiteRef)){
+        nouvelleQuantite = newQ;
+      } else {
+        nouvelleQuantite = '';
+      }
+      const newE = m.nouvelEmplacement ?? '';
+      if(String(newE).trim() !== '' && !sameValue(newE, m.emplacement)){
+        nouvelEmplacement = newE;
+      }
+    }
+
+    rows.push({
+      article: d.article ?? '',
+      ean13: d.ean13 ?? '',
+      titre: d.titre ?? '',
+      magasin: d.magasin ?? '',
+      emplacement: d.emplace ?? '',
+      nouvelEmplacement: nouvelEmplacement,
+      quantite: quantiteRef,
+      nouvelleQuantite: nouvelleQuantite,
+    });
+  }
+  rows.sort((a,b)=> sortFr(a.titre, b.titre) || sortFr(a.article, b.article));
+  return rows;
+}
+
+function populateMagasinSelector(){
+  const sel = document.getElementById('selInvMagasin');
+  const magasins = [...new Set(dataTable.map(r=>String(r.magasin)).filter(Boolean))]
+    .sort(sortFr);
+  const prev = sel.value;
+  sel.innerHTML = magasins.map(m=>`<option value="${m.replace(/"/g,'&quot;')}">${m}</option>`).join('');
+  if(magasins.includes(prev)) sel.value = prev;
+  populateEmplacementSelector();
+}
+function populateEmplacementSelector(){
+  const mag = document.getElementById('selInvMagasin').value;
+  const sel = document.getElementById('selInvEmplacement');
+  const emps = [...new Set(
+    dataTable.filter(r=>String(r.magasin)===String(mag))
+             .map(r=>String(r.emplace)).filter(Boolean)
+  )].sort(sortFr);
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">Tous les emplacements</option>' +
+    emps.map(e=>`<option value="${e.replace(/"/g,'&quot;')}">${e}</option>`).join('');
+  if(emps.includes(prev)) sel.value = prev;
+}
+document.getElementById('selInvMagasin').addEventListener('change', populateEmplacementSelector);
+
+async function initInventaireTab(){
+  if(dataTable.length===0) await loadDataTable();
+  if(modifTable.length===0) await loadModifTable();
+  populateMagasinSelector();
+}
+
+document.getElementById('btnReloadInv').addEventListener('click', async ()=>{
+  await loadDataTable();
+  await loadModifTable();
+  populateMagasinSelector();
+  toast('Référentiel et modifications rechargés','ok');
+});
+
+document.getElementById('btnGenInventaire').addEventListener('click', ()=>{
+  const magasin = document.getElementById('selInvMagasin').value;
+  const emplacement = document.getElementById('selInvEmplacement').value;
+  if(!magasin){ toast('Choisissez un magasin','err'); return; }
+  invView.rows = buildInventaireRows(magasin, emplacement);
+  invView.sort = {key:null, dir:1};
+  invView.filters = {};
+  invView.nonEmptyActive = {};
+  invView.renderHead();
+  invView.renderBody();
+  const scope = emplacement ? (magasin + ' / ' + emplacement) : (magasin + ' / tous emplacements');
+  document.getElementById('statInvInfo').textContent =
+    scope + ' — ' + invView.rows.length + ' article(s), croisés avec ' + modifTable.length + ' modification(s)';
+  toast('Inventaire généré : ' + invView.rows.length + ' ligne(s)', 'ok');
+});
+document.getElementById('btnExportInv').addEventListener('click', ()=>{
+  const magasin = document.getElementById('selInvMagasin').value || 'tous';
+  const emplacement = document.getElementById('selInvEmplacement').value || 'tous';
+  exportViewToExcel(invView, `inventaire_${magasin}_${emplacement}.xlsx`);
+});
+document.getElementById('btnPrintInv').addEventListener('click', ()=> window.print());
 
 /* ======================================================================
    PARAMETRES GITHUB
