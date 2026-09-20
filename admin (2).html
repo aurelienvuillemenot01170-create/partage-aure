@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kaïrosmose · La Maison</title>
+<style>
+:root{--ink:#211f1b;--gold:#b9955a;--cream:#f5f1e9;--card:#fffdf9;--line:#ded6c9;--muted:#746d62;--danger:#9a4c3e;--ok:#496b4e}
+*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font:14px system-ui,-apple-system,sans-serif}header{background:var(--ink);color:white;padding:30px 5%}header small{color:#d6b982;letter-spacing:2px}.wrap{max-width:1400px;margin:auto;padding:24px 4%}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px}.wide{grid-column:1/-1}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px;box-shadow:0 8px 30px #0000000a}h1,h2,h3{font-weight:400}h1{margin:6px 0;font-family:Georgia,serif;font-size:34px}h2{margin-top:0}.muted{color:var(--muted)}input,textarea,select,button{font:inherit;width:100%;padding:10px;border-radius:11px;border:1px solid var(--line);margin:4px 0}textarea{resize:vertical}button{background:var(--ink);color:white;cursor:pointer}button.secondary{background:white;color:var(--ink)}button.danger{background:var(--danger)}button.gold{background:var(--gold);color:#fff}.row{display:flex;gap:8px}.row>*{flex:1}.stat{font-size:27px;font-family:Georgia,serif}.ok{color:var(--ok)}.warn{color:#9b6931}.error{color:var(--danger)}pre{white-space:pre-wrap;background:#f0ece4;padding:12px;border-radius:12px;max-height:300px;overflow:auto}.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:12px}.perf{border:1px solid var(--line);border-radius:15px;padding:13px;background:#fff}.perf img{width:62px;height:62px;object-fit:cover;border-radius:10px;float:left;margin-right:10px;background:#eee}.perf b{display:block}.perf small{color:var(--muted)}.clear{clear:both}.pill{display:inline-block;background:#eee7dc;border-radius:99px;padding:3px 8px;margin:2px;font-size:12px}.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:15px;z-index:10}.modal.show{display:flex}.modalbox{background:var(--card);max-width:900px;width:100%;max-height:94vh;overflow:auto;border-radius:22px;padding:22px}.sectiontitle{margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:5px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.source-result{border:1px solid var(--line);border-radius:12px;padding:10px;margin:7px 0}.source-result button{width:auto;padding:6px 10px}.hidden{display:none}@media(max-width:600px){.grid2{grid-template-columns:1fr}.row{flex-direction:column}}
+</style></head>
+<body>
+<header><small>KAÏROSMOSE · ATELIER</small><h1>La Maison</h1><div>Catalogue, contrôle qualité et alimentation des parfums.</div></header>
+<main class="wrap">
+<div class="grid">
+<section class="card">
+<h2>Connexion administrateur</h2><p class="muted">Configuration Firebase Web + compte administrateur.</p>
+<textarea id="firebaseConfig" rows="6" placeholder='{"apiKey":"…","authDomain":"…","projectId":"…","appId":"…"}'></textarea>
+<div class="row"><input id="adminEmail" type="email" autocomplete="username" placeholder="E-mail administrateur"><input id="adminPassword" type="password" autocomplete="current-password" placeholder="Mot de passe"></div>
+<div class="row"><button onclick="connect()">Se connecter</button><button class="secondary" onclick="disconnect()">Se déconnecter</button></div><div id="authStatus" class="muted">Non connecté</div>
+</section>
+<section class="card"><h2>État du catalogue</h2><div class="row"><div><div class="stat" id="count">—</div><span class="muted">fiches</span></div><div><div class="stat" id="bad">—</div><span class="muted">à contrôler</span></div></div><button onclick="validateCatalog()">Contrôler les fiches</button><pre id="validation">—</pre></section>
+<section class="card wide"><h2>Contributions utilisateurs</h2><p class="muted">Les membres peuvent proposer des fiches personnelles. Rien n'entre dans La Maison sans validation manuelle.</p><button onclick="loadSubmissions()">Charger les propositions</button><div id="submissions" class="catalog"><div class="muted">Aucune proposition chargée.</div></div></section>
+<section class="card wide"><h2>Modifications à valider</h2><p class="muted">Chaque ligne représente une modification proposée par un membre. Toutes les lignes sont sélectionnées par défaut ; la nouvelle valeur peut être corrigée directement avant validation.</p><button onclick="loadModifications()">Charger les modifications</button><div id="modifications"><div class="muted">Aucune modification chargée.</div></div></section><section class="card wide"><h2>Catalogue</h2><div class="row"><input id="catalogSearch" placeholder="Rechercher marque, nom, famille, note…" oninput="debouncedSearch()"><button style="max-width:180px" onclick="openEditor()">＋ Nouveau parfum</button></div><div id="catalog" class="catalog"><div class="muted">Connectez-vous pour charger le catalogue.</div></div></section>
+<section class="card"><h2>Alimentation gratuite · Open Beauty Facts</h2><p class="muted">Recherche de produits cosmétiques via l'API Open Beauty Facts. Les résultats sont proposés comme candidats : aucune écriture automatique.</p><div class="row"><input id="sourceQuery" placeholder="Ex. Dior Sauvage"><button style="max-width:150px" onclick="searchSource()">Rechercher</button></div><div class="row"><input id="sourceBarcode" placeholder="EAN / code-barres"><button style="max-width:150px" onclick="lookupBarcode()">Chercher EAN</button></div><div id="sourceResults"></div></section>
+<section class="card"><h2>Import / export</h2><p class="muted">Import JSON ou CSV. Prévisualisation puis validation explicite.</p><input type="file" id="dataFile" accept="application/json,.json,text/csv,.csv"><button onclick="previewImport()">Analyser le fichier</button><button class="secondary" onclick="exportCatalog()">Exporter le catalogue JSON</button><pre id="importResult">—</pre></section>
+<section class="card wide"><h2>Import scraper · fiches + photos</h2><p class="muted">Importe un JSON déjà regroupé par ligne olfactive (sortie de <code>transform_hierarchy.py</code> : une fiche = un parfum, jamais une par taille de flacon) et le dossier <code>images</code> du scraper. Chaque photo choisie est redimensionnée et compressée <b>dans le navigateur</b> avant l'envoi sur Firebase Storage — une seule image par fiche est uploadée, jamais une par référence/EAN.</p>
+<div class="grid2">
+<div><label class="muted">Fichier JSON transformé</label><input type="file" id="scraperJsonFile" accept="application/json,.json"></div>
+<div><label class="muted">Dossier « images » du scraper (sélectionner le dossier, pas un fichier)</label><input type="file" id="scraperImagesDir" webkitdirectory directory multiple></div>
+</div>
+<button onclick="previewScraperImport()">Analyser</button>
+<pre id="scraperImportResult">—</pre>
+<div id="scraperImportProgress" class="muted"></div>
+</section>
+<section class="card wide"><h2>Synchronisation / index</h2><p class="muted">Reconstruit les champs de recherche. Les futures sources pourront être ajoutées côté serveur sans exposer de clés privées.</p><button onclick="syncCatalog()">Reconstruire les index</button><pre id="syncResult">—</pre></section>
+</div></main>
+
+<div id="editor" class="modal"><div class="modalbox"><div class="row"><h2 style="flex:1" id="editorTitle">Nouveau parfum</h2><button style="max-width:120px" class="secondary" onclick="closeEditor()">Fermer</button></div>
+<input type="hidden" id="p_id"><div class="grid2"><input id="p_brand" placeholder="Marque *"><input id="p_name" placeholder="Nom *"><input id="p_family" placeholder="Famille olfactive *"><input id="p_gender" placeholder="Genre"><input id="p_concentration" placeholder="Concentration"><input id="p_ean" placeholder="EAN / code-barres"><input id="p_imageUrl" placeholder="URL image"><input id="p_year" placeholder="Année"><input id="p_source" placeholder="Source"><input id="p_sourceUrl" placeholder="URL source"></div>
+<h3 class="sectiontitle">Pyramide olfactive</h3><div class="grid2"><textarea id="p_notesTop" rows="4" placeholder="Notes de tête — une note par ligne ou séparées par des virgules"></textarea><textarea id="p_notesHeart" rows="4" placeholder="Notes de cœur"></textarea><textarea id="p_notesBase" rows="4" placeholder="Notes de fond"></textarea><textarea id="p_tags" rows="4" placeholder="Tags"></textarea></div>
+<h3 class="sectiontitle">Kairosmose</h3><div class="grid2"><textarea id="p_colors" rows="3" placeholder="Couleurs associées"></textarea><textarea id="p_seasons" rows="3" placeholder="Saisons"></textarea></div><textarea id="p_description" rows="4" placeholder="Description"></textarea>
+<div class="row"><button class="gold" onclick="savePerfume()">Enregistrer</button><button id="deleteBtn" class="danger hidden" onclick="deletePerfume()">Supprimer</button></div><pre id="editorStatus">—</pre></div></div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+import {getAuth,signInWithEmailAndPassword,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+import {getFirestore,collection,getDocs,getDoc,doc,setDoc,deleteDoc,writeBatch,serverTimestamp,updateDoc} from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+import {getStorage,ref as storageRef,uploadBytes,getDownloadURL} from "https://www.gstatic.com/firebasejs/11.1.0/firebase-storage.js";
+let auth=null,app=null,db=null,config=null,searchTimer=null,catalogCache=[];
+const $=id=>document.getElementById(id);
+const splitList=v=>Array.isArray(v)?[...new Set(v.map(x=>String(x).trim()).filter(Boolean))]:String(v||"").split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);
+const normalize=v=>String(v||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+const searchText=p=>normalize([p.brand,p.name,p.family,...(p.tags||[]),...(p.notesTop||[]),...(p.notesHeart||[]),...(p.notesBase||[])].join(" "));
+const makeId=p=>{let x=normalize(`${p.brand||"parfum"}-${p.name||"sans-nom"}`).replace(/\s+/g,"-").slice(0,80);return x||`perfume-${Date.now()}`};
+const parseConfig=()=>{const raw=$("firebaseConfig").value.trim();if(!raw)throw Error("Collez la configuration Firebase JSON.");const c=JSON.parse(raw.replace(/^```json\s*/i,"").replace(/\s*```$/i,""));if(!c.apiKey||!c.authDomain||!c.projectId||!c.appId)throw Error("Configuration Firebase incomplète.");return c};
+async function requireAdmin(){if(!auth?.currentUser)throw Error("Connectez-vous d’abord.");const t=await auth.currentUser.getIdTokenResult(true);if(t.claims.admin!==true)throw Error("Compte authentifié mais sans rôle administrateur.")}
+async function loadModifications(){try{await requireAdmin();if(!catalogCache.length)await loadCatalog();const snap=await getDocs(collection(db,"perfumeModifications"));const rows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.status==="pending");const fields=rows.flatMap(r=>(r.changes||[]).map((c,i)=>({requestId:r.id,index:i,contributor:r.contributorName||"un membre",perfumeId:r.perfumeId,product:(catalogCache.find(p=>p.id===r.perfumeId)||{}),field:c.field||"",oldValue:c.oldValue||"",newValue:c.newValue||""})));$("modifications").innerHTML=fields.length?`<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th></th><th>Produit</th><th>Champ</th><th>Ancienne valeur</th><th>Nouvelle valeur</th><th>Contributeur</th></tr></thead><tbody>${fields.map((x,i)=>`<tr style="border-top:1px solid var(--line)"><td><input type="checkbox" data-mod="${i}" checked style="width:auto"></td><td>${esc(x.product.brand||x.perfumeId)} · ${esc(x.product.name||"")}</td><td>${esc(x.field)}</td><td>${esc(x.oldValue)}</td><td><input id="modval_${i}" value="${esc(x.newValue)}"></td><td>${esc(x.contributor)}</td></tr>`).join("")}</tbody></table></div><button class="gold" onclick='validateModifications()'>Valider les modifications sélectionnées</button>`:"<div class=muted>Aucune modification en attente.</div>";window._modFields=fields}catch(e){$("modifications").textContent=e.message}}
+window.validateModifications=async()=>{try{await requireAdmin();const fields=(window._modFields||[]).map((x,i)=>({...x,__renderIndex:i}));const selected=fields.filter((x,i)=>$("modifications").querySelector(`[data-mod="${i}"]`).checked).map((x)=>({...x,newValue:$("modifications").querySelector(`#modval_${x.__renderIndex??fields.indexOf(x)}`).value}));if(!selected.length)throw Error("Aucune ligne sélectionnée.");const grouped={};selected.forEach(x=>(grouped[x.requestId]??=[]).push(x));for(const [requestId,items] of Object.entries(grouped)){const req=(await getDoc(doc(db,"perfumeModifications",requestId))).data();const ref=doc(db,"perfumes",req.perfumeId);const current=(await getDoc(ref)).data()||{};const updates={};items.forEach(x=>{let v=x.newValue;if(["notesTop","notesHeart","notesBase","tags","associatedColors","seasons"].includes(x.field))v=v.split(/[,·\n]/).map(s=>s.trim()).filter(Boolean);updates[x.field]=v});const merged={...current,...updates};await setDoc(ref,{...merged,...indexed(merged),updatedAt:serverTimestamp()},{merge:true});await updateDoc(doc(db,"perfumeModifications",requestId),{status:"approved",approvedAt:serverTimestamp(),approvedChanges:items.map(x=>({field:x.field,newValue:x.newValue}))})}await loadModifications();await loadCatalog();await searchCatalog()}catch(e){alert(e.message)}};
+
+async function loadSubmissions(){try{await requireAdmin();const snap=await getDocs(collection(db,"perfumeSubmissions"));const rows=snap.docs.map(d=>({id:d.id,...d.data()})).filter(x=>x.status==="pending");$("submissions").innerHTML=rows.length?rows.map(p=>`<article class="perf">${p.imageUrl?`<img src="${esc(p.imageUrl)}" onerror="this.style.display='none'">`:''}<b>${esc(p.brand||"")}</b><span>${esc(p.name||"")}</span><small>${esc(p.family||"")} · proposé par ${esc(p.contributorName||"un membre")}</small><div class="clear"></div><button class="gold" onclick='approveSubmission(${JSON.stringify(p).replace(/</g,"\u003c")})'>Valider dans La Maison</button><button class="secondary" onclick='rejectSubmission("${p.id}")'>Refuser</button></article>`).join(""):"<div class=muted>Aucune proposition en attente.</div>"}catch(e){$("submissions").textContent=e.message}}
+window.approveSubmission=async p=>{try{await requireAdmin();if(!p.brand||!p.name||!p.family)throw Error("La fiche doit contenir marque, nom et famille avant validation.");const id=makeId(p);let imageUrl=p.imageUrl||"";if(imageUrl){try{const r=await fetch(imageUrl);if(r.ok){const blob=await r.blob();const target=storageRef(getStorage(),`perfumes/${id}.jpg`);await uploadBytes(target,blob,{contentType:blob.type||"image/jpeg"});imageUrl=await getDownloadURL(target);}}catch(imageError){console.warn("Migration image non bloquante",imageError)}}const data={...cleanPerfume({...p,imageUrl}),...indexed({...p,imageUrl}),contributorName:p.contributorName||"",contributorId:p.contributorId||"",sourceType:"Utilisateur",source:"Contribution utilisateur",validatedAt:serverTimestamp()};await setDoc(doc(db,"perfumes",id),data,{merge:true});await updateDoc(doc(db,"perfumeSubmissions",p.id),{status:"approved",approvedPerfumeId:id,approvedAt:serverTimestamp()});await loadCatalog();await loadSubmissions();}catch(e){alert(e.message)}};
+window.rejectSubmission=async id=>{try{await requireAdmin();await updateDoc(doc(db,"perfumeSubmissions",id),{status:"rejected",rejectedAt:serverTimestamp()});await loadSubmissions()}catch(e){alert(e.message)}};
+async function loadCatalog(){await requireAdmin();const snap=await getDocs(collection(db,"perfumes"));catalogCache=snap.docs.map(d=>({id:d.id,...d.data()}));catalogCache.sort((a,b)=>normalize(`${a.brand} ${a.name}`).localeCompare(normalize(`${b.brand} ${b.name}`)));$("count").textContent=catalogCache.length;return catalogCache}
+function cleanPerfume(input){const p=input||{};return {brand:String(p.brand||"").trim(),name:String(p.name||"").trim(),family:String(p.family||"").trim(),gender:String(p.gender||"Unisexe").trim(),concentration:String(p.concentration||"").trim(),ean:String(p.ean||p.code||"").replace(/\D/g,""),year:String(p.year||"").trim(),description:String(p.description||"").trim(),imageUrl:String(p.imageUrl||"").trim(),source:String(p.source||"").trim(),sourceUrl:String(p.sourceUrl||"").trim(),notesTop:splitList(p.notesTop),notesHeart:splitList(p.notesHeart),notesBase:splitList(p.notesBase),tags:splitList(p.tags),associatedColors:splitList(p.associatedColors),seasons:splitList(p.seasons),offers:Array.isArray(p.offers)?p.offers:[]}}
+function indexed(p){return {searchKey:searchText(p),searchTokens:[...new Set(searchText(p).split(/\s+/).filter(x=>x.length>=2))].slice(0,80)}}
+window.connect=async()=>{try{config=parseConfig();if(!app)app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);const email=$("adminEmail").value.trim(),password=$("adminPassword").value;if(!email||!password)throw Error("Indiquez l’e-mail et le mot de passe.");$("authStatus").textContent="Connexion…";const c=await signInWithEmailAndPassword(auth,email,password);const t=await c.user.getIdTokenResult(true);if(t.claims.admin!==true){await signOut(auth);throw Error("Compte authentifié mais sans rôle administrateur.")}$("authStatus").textContent=`Connecté · administrateur · ${c.user.email}`;await loadCatalog();await Promise.all([loadSubmissions(),loadModifications()]);await searchCatalog()}catch(e){$("authStatus").textContent="Erreur : "+e.message}};
+window.disconnect=async()=>{if(auth)await signOut(auth);catalogCache=[];$("authStatus").textContent="Déconnecté";$("catalog").innerHTML='<div class="muted">Déconnecté.</div>'};
+window.validateCatalog=async()=>{try{await loadCatalog();const invalid=[];catalogCache.forEach(p=>{const missing=[];if(!p.brand)missing.push("marque");if(!p.name)missing.push("nom");if(!p.family)missing.push("famille");if(missing.length)invalid.push({id:p.id,reason:"champs manquants : "+missing.join(", ")})});$("bad").textContent=invalid.length;$("validation").textContent=invalid.length?invalid.map(x=>`${x.id} · ${x.reason}`).join("\n"):"Catalogue cohérent."}catch(e){$("validation").textContent=e.message}};
+window.searchCatalog=async()=>{try{if(!db)throw Error("Connectez-vous d’abord.");if(!catalogCache.length)await loadCatalog();const q=normalize($("catalogSearch").value);const terms=q.split(/\s+/).filter(Boolean);const items=!terms.length?catalogCache:catalogCache.filter(p=>{const t=searchText(p);return terms.every(x=>t.includes(x))});renderCatalog(items.slice(0,200))}catch(e){$("catalog").innerHTML=`<div class="error">${esc(e.message)}</div>`}};
+window.debouncedSearch=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(searchCatalog,250)};
+function renderCatalog(items){if(!items.length){$("catalog").innerHTML='<div class="muted">Aucun parfum trouvé.</div>';return}$("catalog").innerHTML=items.map(p=>`<article class="perf">${p.imageUrl?`<img src="${esc(p.imageUrl)}" onerror="this.style.display='none'">`:''}<b>${esc(p.brand||"")}</b><span>${esc(p.name||"")}</span><small>${esc(p.family||"Famille non renseignée")}</small><div class="clear"></div><div>${(p.seasons||[]).slice(0,3).map(x=>`<span class="pill">${esc(x)}</span>`).join("")}</div><button class="secondary" onclick='editPerfume(${JSON.stringify(p).replace(/</g,"\\u003c")})'>Modifier</button></article>`).join("")}
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+window.openEditor=()=>{fillEditor({});$("editorTitle").textContent="Nouveau parfum";$("deleteBtn").classList.add("hidden");$("editor").classList.add("show")};
+window.editPerfume=p=>{fillEditor(p);$("editorTitle").textContent=`Modifier · ${p.brand||""} ${p.name||""}`;$("deleteBtn").classList.remove("hidden");$("editor").classList.add("show")};
+window.closeEditor=()=>$("editor").classList.remove("show");
+function fillEditor(p){$("p_id").value=p.id||"";$("p_brand").value=p.brand||"";$("p_name").value=p.name||"";$("p_family").value=p.family||"";$("p_gender").value=p.gender||"Unisexe";$("p_concentration").value=p.concentration||"";$("p_ean").value=p.ean||"";$("p_imageUrl").value=p.imageUrl||"";$("p_year").value=p.year||"";$("p_source").value=p.source||"";$("p_sourceUrl").value=p.sourceUrl||"";$("p_notesTop").value=(p.notesTop||[]).join("\n");$("p_notesHeart").value=(p.notesHeart||[]).join("\n");$("p_notesBase").value=(p.notesBase||[]).join("\n");$("p_tags").value=(p.tags||[]).join("\n");$("p_colors").value=(p.associatedColors||[]).join("\n");$("p_seasons").value=(p.seasons||[]).join("\n");$("p_description").value=p.description||"";$("editorStatus").textContent="—"}
+function editorData(){return cleanPerfume({id:$("p_id").value.trim(),brand:$("p_brand").value.trim(),name:$("p_name").value.trim(),family:$("p_family").value.trim(),gender:$("p_gender").value.trim()||"Unisexe",concentration:$("p_concentration").value.trim(),ean:$("p_ean").value.trim(),imageUrl:$("p_imageUrl").value.trim(),year:$("p_year").value.trim(),source:$("p_source").value.trim(),sourceUrl:$("p_sourceUrl").value.trim(),notesTop:$("p_notesTop").value,notesHeart:$("p_notesHeart").value,notesBase:$("p_notesBase").value,tags:$("p_tags").value,associatedColors:$("p_colors").value,seasons:$("p_seasons").value,description:$("p_description").value.trim()})}
+window.savePerfume=async()=>{try{await requireAdmin();const p=editorData();if(!p.brand||!p.name||!p.family)throw Error("Marque, nom et famille sont obligatoires.");let id=p.id||makeId(p);if(!p.id&&catalogCache.some(x=>x.id===id))id=`${id}-${Date.now().toString().slice(-5)}`;const existing=catalogCache.find(x=>x.id===id)||{};const data={...p,...indexed(p),updatedAt:serverTimestamp()};if(existing.offers)delete data.offers;await setDoc(doc(db,"perfumes",id),data,{merge:true});$("editorStatus").textContent=`Enregistré · ${id}`;$("p_id").value=id;$("deleteBtn").classList.remove("hidden");await loadCatalog();await searchCatalog();await validateCatalog()}catch(e){$("editorStatus").textContent=e.message}};
+window.deletePerfume=async()=>{const id=$("p_id").value;if(!id)return;if(!confirm("Supprimer définitivement cette fiche ?"))return;try{await requireAdmin();await deleteDoc(doc(db,"perfumes",id));closeEditor();await loadCatalog();await searchCatalog();await validateCatalog()}catch(e){$("editorStatus").textContent=e.message}};
+window.previewImport=async()=>{try{await requireAdmin();const f=$("dataFile").files[0];if(!f)throw Error("Choisissez un fichier JSON ou CSV.");let rows;if(f.name.toLowerCase().endsWith(".csv")){rows=parseCSV(await f.text())}else{rows=JSON.parse(await f.text());if(!Array.isArray(rows))throw Error("Le JSON doit être un tableau.")}if(!catalogCache.length)await loadCatalog();const existingById=new Map(catalogCache.map(x=>[x.id,x]));const existingByEan=new Map(catalogCache.filter(x=>x.ean).map(x=>[x.ean,x]));const existingByName=new Map(catalogCache.map(x=>[normalize(x.brand)+"|"+normalize(x.name),x]));const valid=[],invalid=[];rows.forEach((raw,i)=>{const p=cleanPerfume(raw),key=normalize(p.brand)+"|"+normalize(p.name);if(!p.brand||!p.name||!p.family){invalid.push({index:i,reason:"marque, nom ou famille manquant"});return}const match=(p.id&&existingById.get(p.id))||(p.ean&&existingByEan.get(p.ean))||existingByName.get(key);valid.push({index:i,id:p.id||match?.id||makeId(p),match:match?.id||null,perfume:p})});const token=`local-${Date.now()}`;window._pendingImport={token,items:valid};$("importResult").textContent=`${rows.length} fiche(s) · ${valid.filter(x=>!x.match).length} nouvelle(s) · ${valid.filter(x=>x.match).length} mise(s) à jour · ${invalid.length} invalide(s)\n\n${invalid.map(x=>x.index+": "+x.reason).join("\n")||"Aucune erreur."}\n\nAucune écriture n'a encore été effectuée.`;const b=document.createElement("button");b.textContent="Valider cet import";b.className="gold";b.onclick=()=>commitImport(token);$("importResult").after(b)}catch(e){$("importResult").textContent=e.message}};
+async function commitImport(token){try{await requireAdmin();if(!window._pendingImport||window._pendingImport.token!==token)throw Error("Prévisualisation expirée. Relancez l’analyse.");const items=window._pendingImport.items;let batch=writeBatch(db),n=0,written=0;for(const x of items){const ref=doc(db,"perfumes",x.id);const p=x.perfume;const data={...p,...indexed(p),updatedAt:serverTimestamp()};if(!data.offers&&x.match)delete data.offers;batch.set(ref,data,{merge:true});n++;written++;if(n===400){await batch.commit();batch=writeBatch(db);n=0}}if(n)await batch.commit();window._pendingImport=null;$("importResult").textContent=`Import terminé : ${written} fiche(s) écrite(s).`;await loadCatalog();await searchCatalog();await validateCatalog()}catch(e){$("importResult").textContent=e.message}}
+function parseCSV(t){const lines=t.split(/\r?\n/).filter(Boolean);if(!lines.length)return[];const parse=l=>{const out=[];let cur="",q=false;for(let i=0;i<l.length;i++){const c=l[i];if(c==='"'&&l[i+1]==='"'){cur+='"';i++;continue}if(c==='"'){q=!q;continue}if(c===','&&!q){out.push(cur.trim());cur=""}else cur+=c}out.push(cur.trim());return out};const h=parse(lines[0]);return lines.slice(1).map(l=>{const v=parse(l),o={};h.forEach((k,i)=>o[k]=v[i]||"");return o})}
+async function obf(url){const r=await fetch(url,{headers:{"Accept":"application/json"}});if(!r.ok)throw Error(`Open Beauty Facts : HTTP ${r.status}`);return r.json()}
+window.searchSource=async()=>{try{const q=$("sourceQuery").value.trim();if(!q)throw Error("Saisissez une recherche.");$("sourceResults").textContent="Recherche…";const u=`https://world.openbeautyfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&json=1&page_size=20&action=process&product_type=beauty&lc=fr`;const d=await obf(u);renderSource((d.products||[]).map(toKairosmoseFromOBF).filter(p=>p.name))}catch(e){$("sourceResults").innerHTML=`<div class="error">${esc(e.message)}</div>`}};
+window.lookupBarcode=async()=>{try{const code=$("sourceBarcode").value.replace(/\D/g,"");if(!code)throw Error("Saisissez un EAN.");$("sourceResults").textContent="Recherche…";const d=await obf(`https://world.openbeautyfacts.org/api/v3/product/${encodeURIComponent(code)}?product_type=beauty&lc=fr&cc=fr`);const p=d.product?toKairosmoseFromOBF(d.product):null;renderSource(p&&p.name?[p]:[])}catch(e){$("sourceResults").innerHTML=`<div class="error">${esc(e.message)}</div>`}};
+function toKairosmoseFromOBF(x){return {id:"",brand:x.brands||"",name:x.product_name_fr||x.product_name||"",family:(x.categories_tags||[]).filter(v=>/parfum|fragrance|perfume|eau-de-parfum|eau-de-toilette/i.test(v)).map(v=>v.split(":").pop().replace(/-/g," ")).slice(-1)[0]||"",gender:"Unisexe",concentration:"",ean:x.code||"",imageUrl:x.image_front_url||x.image_url||"",year:"",source:"Open Beauty Facts",sourceUrl:x.url||`https://world.openbeautyfacts.org/product/${x.code||""}`,notesTop:[],notesHeart:[],notesBase:[],tags:(x.categories_tags||[]).map(v=>v.split(":").pop().replace(/-/g," ")).slice(0,12),associatedColors:[],seasons:[],description:x.generic_name_fr||x.generic_name||""}}
+function renderSource(items){if(!items.length){$("sourceResults").innerHTML='<div class="muted">Aucun produit trouvé.</div>';return}$("sourceResults").innerHTML=items.map(p=>`<div class="source-result"><b>${esc(p.brand)} · ${esc(p.name)}</b><br><small>${esc(p.ean||"")}</small><br>${p.imageUrl?`<img src="${esc(p.imageUrl)}" style="width:55px;height:55px;object-fit:cover;border-radius:8px">`:''}<button onclick='useSource(${JSON.stringify(p).replace(/</g,"\\u003c")})'>Créer / compléter une fiche</button></div>`).join("")}
+window.useSource=p=>{openEditor();fillEditor(p);$("p_id").value="";$("p_source").value="Open Beauty Facts";$("p_sourceUrl").value=p.sourceUrl||"";$("editorTitle").textContent="Nouveau parfum depuis Open Beauty Facts";$("deleteBtn").classList.add("hidden")};
+window.exportCatalog=async()=>{try{await requireAdmin();if(!catalogCache.length)await loadCatalog();const blob=new Blob([JSON.stringify(catalogCache,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="kairosmose-catalogue.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}catch(e){$("importResult").textContent=e.message}};
+window.syncCatalog=async()=>{try{await requireAdmin();if(!catalogCache.length)await loadCatalog();let batch=writeBatch(db),n=0,updated=0;for(const p of catalogCache){batch.update(doc(db,"perfumes",p.id),{...indexed(p),searchIndexedAt:serverTimestamp()});n++;updated++;if(n===400){await batch.commit();batch=writeBatch(db);n=0}}if(n)await batch.commit();$("syncResult").textContent=JSON.stringify({status:"ready",updated},null,2);await loadCatalog();await validateCatalog()}catch(e){$("syncResult").textContent=e.message}};
+
+// ---------------------------------------------------------------------
+// Import scraper (fiches + photos) — schéma étendu produit par
+// transform_hierarchy.py : chaque enregistrement porte les champs
+// standard (brand, name, family...) + des champs bonus préfixés "_"
+// (référence(s) SKU, EAN multiples, tailles disponibles, chemin de la
+// photo choisie). Une seule photo par fiche est redimensionnée/compressée
+// dans le navigateur puis envoyée sur Storage : jamais une image brute
+// par taille/EAN, ce qui est la principale source de gaspillage de
+// stockage sur ce type de catalogue.
+// ---------------------------------------------------------------------
+const THUMB_MAX_DIM = 320;   // vignette : grille catalogue, listes
+const FULL_MAX_DIM = 1000;   // image détail : fiche parfum
+const JPEG_QUALITY = 0.82;
+
+function loadImageFromFile(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>resolve({img,url});
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error(`Image illisible : ${file.name}`))};
+    img.src=url;
+  });
+}
+async function resizeToJpegBlob(file,maxDim,quality){
+  const {img,url}=await loadImageFromFile(file);
+  let w=img.naturalWidth,h=img.naturalHeight;
+  if(w>h && w>maxDim){h=Math.round(h*maxDim/w);w=maxDim}
+  else if(h>=w && h>maxDim){w=Math.round(w*maxDim/h);h=maxDim}
+  const canvas=document.createElement("canvas");
+  canvas.width=w;canvas.height=h;
+  canvas.getContext("2d").drawImage(img,0,0,w,h);
+  URL.revokeObjectURL(url);
+  return await new Promise(res=>canvas.toBlob(res,"image/jpeg",quality));
+}
+
+// Les chemins dans le JSON sont relatifs au dossier "images" (ex.
+// "lancome/00906-LAC_100ML.jpg"). webkitRelativePath des fichiers
+// sélectionnés commence par le nom du dossier choisi (ex.
+// "images/lancome/00906-LAC_100ML.jpg") : on retire ce premier segment
+// pour faire correspondre les deux.
+function buildImageFileIndex(fileList){
+  const map=new Map();
+  for(const f of fileList){
+    const rel=f.webkitRelativePath||f.name;
+    const parts=rel.split("/");
+    const withoutRoot=parts.length>1?parts.slice(1).join("/"):rel;
+    map.set(withoutRoot,f);
+    map.set(parts[parts.length-1],f); // fallback : nom de fichier seul
+  }
+  return map;
+}
+
+window.previewScraperImport=async()=>{
+  try{
+    await requireAdmin();
+    const jsonFile=$("scraperJsonFile").files[0];
+    if(!jsonFile)throw Error("Choisissez le fichier JSON transformé.");
+    const rows=JSON.parse(await jsonFile.text());
+    if(!Array.isArray(rows))throw Error("Le JSON doit être un tableau.");
+    const imageFiles=$("scraperImagesDir").files;
+    const imageIndex=buildImageFileIndex(imageFiles);
+    if(!catalogCache.length)await loadCatalog();
+    const existingByName=new Map(catalogCache.map(x=>[normalize(x.brand)+"|"+normalize(x.name),x]));
+
+    const valid=[],invalid=[],missingImage=[];
+    rows.forEach((raw,i)=>{
+      const p=cleanPerfume(raw);
+      if(!p.brand||!p.name){invalid.push({index:i,reason:"marque ou nom manquant"});return}
+      p.family=p.family||raw.family||""; // famille peut être vide tant que non curée
+      const key=normalize(p.brand)+"|"+normalize(p.name);
+      const match=existingByName.get(key);
+      const id=match?.id||makeId(p);
+      const imageFile=raw._localImage?imageIndex.get(raw._localImage)||imageIndex.get(raw._localImage.split("/").pop()):null;
+      if(raw._localImage&&!imageFile)missingImage.push({index:i,name:p.name,expected:raw._localImage});
+      valid.push({
+        index:i,id,match:match?.id||null,perfume:p,imageFile,
+        bonus:{availableSizes:raw._availableSizes||[],skuReferences:raw._references||[],allEans:raw._allEans||[]}
+      });
+    });
+
+    const token=`scraper-${Date.now()}`;
+    window._pendingScraperImport={token,items:valid};
+    $("scraperImportResult").textContent=
+`${rows.length} fiche(s) lue(s) · ${valid.filter(x=>!x.match).length} nouvelle(s) · ${valid.filter(x=>x.match).length} mise(s) à jour · ${invalid.length} invalide(s)
+Photos trouvées : ${valid.filter(x=>x.imageFile).length}/${valid.length}${missingImage.length?`
+⚠️ Photo introuvable pour : ${missingImage.map(x=>x.name).join(", ")}`:""}
+${invalid.map(x=>x.index+": "+x.reason).join("\n")}
+
+Aucune écriture ni upload n'a encore été effectué.`;
+    const existingBtn=$("scraperImportResult").nextElementSibling;
+    if(existingBtn&&existingBtn.tagName==="BUTTON")existingBtn.remove();
+    const b=document.createElement("button");
+    b.textContent="Valider cet import (upload photos + écriture Firestore)";
+    b.className="gold";
+    b.onclick=()=>commitScraperImport(token);
+    $("scraperImportResult").after(b);
+  }catch(e){$("scraperImportResult").textContent=e.message}
+};
+
+async function commitScraperImport(token){
+  try{
+    await requireAdmin();
+    if(!window._pendingScraperImport||window._pendingScraperImport.token!==token)
+      throw Error("Prévisualisation expirée. Relancez l'analyse.");
+    const items=window._pendingScraperImport.items;
+    const storage=getStorage();
+    let done=0,withImage=0,failed=[];
+    for(const x of items){
+      try{
+        const p={...x.perfume};
+        if(x.imageFile){
+          const [fullBlob,thumbBlob]=await Promise.all([
+            resizeToJpegBlob(x.imageFile,FULL_MAX_DIM,JPEG_QUALITY),
+            resizeToJpegBlob(x.imageFile,THUMB_MAX_DIM,JPEG_QUALITY)
+          ]);
+          const fullRef=storageRef(storage,`perfumes/${x.id}.jpg`);
+          const thumbRef=storageRef(storage,`perfumes/${x.id}_thumb.jpg`);
+          await uploadBytes(fullRef,fullBlob,{contentType:"image/jpeg"});
+          await uploadBytes(thumbRef,thumbBlob,{contentType:"image/jpeg"});
+          p.imageUrl=await getDownloadURL(fullRef);
+          p.thumbUrl=await getDownloadURL(thumbRef);
+          withImage++;
+        }
+        const data={...p,...x.bonus,...indexed(p),updatedAt:serverTimestamp()};
+        await setDoc(doc(db,"perfumes",x.id),data,{merge:true});
+        done++;
+      }catch(err){failed.push(`${x.perfume.brand} ${x.perfume.name} : ${err.message}`)}
+      $("scraperImportProgress").textContent=`${done}/${items.length} fiche(s) écrite(s) · ${withImage} avec photo…`;
+    }
+    window._pendingScraperImport=null;
+    $("scraperImportResult").textContent=
+`Import terminé : ${done} fiche(s) écrite(s), ${withImage} avec photo optimisée (miniature ${THUMB_MAX_DIM}px + détail ${FULL_MAX_DIM}px, JPEG q${Math.round(JPEG_QUALITY*100)}).${failed.length?`
+Échecs :
+${failed.join("\n")}`:""}`;
+    await loadCatalog();await searchCatalog();await validateCatalog();
+  }catch(e){$("scraperImportResult").textContent=e.message}
+}
+
+onAuthStateChanged(getAuth(),()=>{});
+</script></body></html>
