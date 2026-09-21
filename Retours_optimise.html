@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>Retours — Terrain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --ink:#16232B;
+    --ink-soft:#4B5B62;
+    --paper:#EEF2F1;
+    --surface:#FFFFFF;
+    --line:#D9E1DE;
+    --brand:#145C57;
+    --brand-dark:#0E403C;
+    --amber:#D98E2B;
+    --amber-dark:#A6690F;
+    --success:#3C8A5C;
+    --success-dark:#2C6B45;
+    --danger:#B23A2E;
+    --danger-dark:#8C2C22;
+    --inv-green:#DCEEE3;
+    --inv-pink:#F8E1DE;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;}
+  body{
+    background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;
+    display:flex;flex-direction:column;height:100dvh;
+  }
+  h1,.display{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---------- App bar ---------- */
+  .appbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 16px;background:var(--brand);color:#fff;flex:0 0 auto;
+    padding-top:max(12px, env(safe-area-inset-top));
+  }
+  .appbar h1{font-size:1rem;margin:0;font-weight:600;}
+  .gear-btn{
+    width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.08);color:#fff;font-size:1rem;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---------- Actions RAZ / Envoyer ---------- */
+  .actionbar{display:flex;gap:8px;flex:1;min-width:0;padding:0;}
+  .appbar-right{display:flex;gap:8px;align-items:center;flex:0 0 auto;}
+  .icon-sound{display:block;}
+  .action-btn{
+    flex:1;min-width:0;border:none;border-radius:10px;padding:7px 6px;font-family:'Space Grotesk',sans-serif;
+    font-weight:700;font-size:.75rem;color:#fff;letter-spacing:.1px;white-space:nowrap;
+    transition:transform .08s, box-shadow .1s;
+  }
+  .action-btn:active{transform:translateY(2px) scale(.98);}
+  .btn-raz{background:var(--danger);box-shadow:0 3px 0 var(--danger-dark);}
+  .btn-raz:active{box-shadow:0 1px 0 var(--danger-dark);}
+  .btn-envoyer{background:var(--success);box-shadow:0 3px 0 var(--success-dark);}
+  .btn-envoyer:active{box-shadow:0 1px 0 var(--success-dark);}
+
+  /* ---------- Bandeau inventaire ---------- */
+  .inv-banner{
+    margin:6px 14px 0;border-radius:12px;background:var(--amber);color:#3A2705;
+    padding:10px 14px;flex:0 0 auto;transition:padding .2s;
+  }
+  .inv-row1{display:flex;align-items:center;gap:10px;font-weight:600;font-size:.92rem;}
+  .inv-row1 input{width:19px;height:19px;}
+  .inv-details{display:none;margin-top:10px;gap:10px;flex-wrap:wrap;align-items:center;}
+  .inv-banner.expanded .inv-details{display:flex;}
+  .inv-banner.expanded.collapsed .inv-details{display:none;}
+  .inv-row1 label{flex:1;}
+  .inv-toggle{
+    margin-left:auto;border:none;background:rgba(0,0,0,.15);color:#3A2705;cursor:pointer;
+    width:26px;height:26px;border-radius:8px;font-size:.85rem;line-height:1;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+    transition:transform .2s;
+  }
+  .inv-banner.expanded:not(.collapsed) .inv-toggle{transform:rotate(180deg);}
+  .inv-row2{display:flex;align-items:center;gap:8px;font-size:.85rem;font-weight:500;flex:1 1 100%;}
+  .inv-row2 input{width:17px;height:17px;}
+  .inv-field{display:flex;align-items:center;gap:8px;font-size:.85rem;flex:1 1 44%;min-width:150px;}
+  .inv-field label{font-weight:600;white-space:nowrap;}
+  .inv-field select{flex:1;padding:7px 8px;border-radius:8px;border:1px solid rgba(0,0,0,.15);font-size:.85rem;min-width:0;}
+  .inv-counter{
+    flex:1 1 100%;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.95rem;
+    background:rgba(255,255,255,.55);border-radius:8px;padding:6px 10px;text-align:center;
+  }
+
+  /* ---------- Table résultats ---------- */
+  .table-scroll{flex:1 1 auto;overflow-y:auto;padding:10px 14px 4px;-webkit-overflow-scrolling:touch;}
+  .rowcard{
+    background:var(--surface);border-radius:10px;padding:10px 12px;margin-bottom:8px;
+    border:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:4px 10px;
+    font-size:.85rem;position:relative;
+  }
+  .rowcard.inv-match{background:var(--inv-green);border-color:#B6DAC5;}
+  .rowcard.inv-mismatch{background:var(--inv-pink);border-color:#EAC0BA;}
+  .rowcard.flash{animation:flashRow 1.4s ease;}
+  @keyframes flashRow{
+    0%{box-shadow:0 0 0 3px var(--amber);}
+    100%{box-shadow:0 0 0 0 rgba(217,142,43,0);}
+  }
+  .rc-titre{grid-column:1/3;font-weight:600;color:var(--ink);font-size:.88rem;}
+  .rc-meta{color:var(--ink-soft);font-size:.78rem;grid-column:1/3;display:flex;gap:12px;flex-wrap:wrap;}
+  .rc-editfields{grid-column:1/3;display:flex;gap:10px;margin-top:4px;}
+  .rc-editfields .ef{flex:1;}
+  .rc-editfields label{display:block;font-size:.68rem;color:var(--ink-soft);margin-bottom:2px;}
+  .ef-value{
+    display:block;width:100%;border:1px solid transparent;border-radius:7px;padding:6px 8px;font-size:.85rem;
+    font-family:'IBM Plex Mono',monospace;background:#F5F8F7;color:var(--ink);
+  }
+  .ef-value.modified{color:var(--danger);font-weight:600;}
+  .rc-editfields input{
+    width:100%;border:1px solid var(--brand);border-radius:7px;padding:6px 8px;font-size:.85rem;
+    font-family:'IBM Plex Mono',monospace;background:#fff;
+  }
+  .empty-state{text-align:center;color:var(--ink-soft);padding:40px 20px;font-size:.9rem;}
+
+  /* ---------- Boutons SCAN / LOUPE ---------- */
+  .scan-zone{flex:0 0 auto;padding:10px 16px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(180deg, rgba(238,242,241,0), var(--paper) 30%);}
+  .scan-buttons{display:flex;gap:10px;align-items:stretch;}
+  #btnSearch{
+    flex:0 0 25%;
+    padding:20px 0;
+    border:none;border-radius:16px;
+    background:radial-gradient(circle at 30% 20%, #1C7A72, var(--brand) 70%);
+    color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 0 var(--brand-dark), 0 10px 22px rgba(20,92,87,.35);
+    transition:transform .07s, box-shadow .1s;
+  }
+  #btnSearch:active{transform:translateY(4px);box-shadow:0 2px 0 var(--brand-dark), 0 4px 10px rgba(20,92,87,.3);}
+  #btnScan{
+    flex:1 1 auto;
+    padding:20px;border:none;border-radius:16px;
+    background:radial-gradient(circle at 30% 20%, #1C7A72, var(--brand) 70%);
+    color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.2rem;letter-spacing:.5px;
+    box-shadow:0 6px 0 var(--brand-dark), 0 10px 22px rgba(20,92,87,.35);
+    transition:transform .07s, box-shadow .1s;
+  }
+  #btnScan:active{
+    transform:translateY(4px); box-shadow:0 2px 0 var(--brand-dark), 0 4px 10px rgba(20,92,87,.3);
+  }
+
+  /* ---------- Camera modal ---------- */
+  .cam-modal{position:fixed;inset:0;background:#000;display:none;flex-direction:column;z-index:80;}
+  .cam-modal.show{display:flex;}
+  #camReader{flex:1;}
+  .cam-close{
+    position:absolute;top:max(14px, env(safe-area-inset-top));right:14px;z-index:81;
+    background:rgba(255,255,255,.9);border:none;border-radius:50%;width:38px;height:38px;font-size:1.1rem;
+  }
+  .cam-hint{position:absolute;bottom:max(20px, env(safe-area-inset-bottom));left:0;right:0;text-align:center;color:#fff;font-size:.85rem;}
+
+  /* ---------- Toast / modal ---------- */
+  #toast{
+    position:fixed;bottom:110px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:11px 20px;border-radius:9px;font-size:.85rem;
+    opacity:0;pointer-events:none;transition:all .25s ease;z-index:100;max-width:88vw;text-align:center;
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #toast.ok{background:var(--success);}
+  #toast.err{background:var(--danger);}
+
+  .modal-back{position:fixed;inset:0;background:rgba(20,30,28,.45);display:none;align-items:center;justify-content:center;z-index:90;}
+  .modal-back.show{display:flex;}
+  .modal{background:#fff;border-radius:12px;padding:22px;width:min(340px,86vw);box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal p{font-size:.9rem;color:var(--ink-soft);}
+  .modal input[type=password]{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:.88rem;margin-top:6px;}
+  .modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
+  .modal .actions button{border:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:.85rem;}
+  .btn-cancel{background:var(--paper);color:var(--ink);}
+  .btn-confirm{background:var(--danger);color:#fff;}
+  .btn-confirm.ok{background:var(--success);}
+
+  /* ---------- Modal de recherche (plein écran) ---------- */
+  .search-modal{
+    position:fixed;inset:0;background:var(--paper);
+    display:none;flex-direction:column;z-index:85;
+  }
+  .search-modal.show{display:flex;}
+  .search-header{
+    flex:0 0 auto;background:var(--surface);
+    padding:12px 14px;
+    padding-top:max(12px, env(safe-area-inset-top));
+    border-bottom:1px solid var(--line);
+    box-shadow:0 2px 10px rgba(0,0,0,.05);
+  }
+  .search-input-wrap{position:relative;}
+  #searchInput{
+    width:100%;
+    padding:12px 44px 12px 14px;
+    border:1px solid var(--line);border-radius:10px;
+    font-size:1rem;font-family:'IBM Plex Sans',sans-serif;
+    outline:none;background:#F5F8F7;
+  }
+  #searchInput:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(20,92,87,.12);}
+  .search-close{
+    position:absolute;top:50%;right:8px;transform:translateY(-50%);
+    width:32px;height:32px;border:none;border-radius:50%;
+    background:transparent;color:var(--ink-soft);font-size:1.1rem;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .search-close:active{background:var(--paper);}
+  .search-actions{display:flex;gap:10px;margin-top:10px;}
+  .search-actions button{
+    flex:1;border:none;border-radius:10px;padding:11px 8px;
+    font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.9rem;color:#fff;
+    letter-spacing:.1px;transition:transform .08s, box-shadow .1s;
+  }
+  .search-actions .btn-search-ok{background:var(--success);box-shadow:0 3px 0 var(--success-dark);}
+  .search-actions .btn-search-ok:active{transform:translateY(2px);box-shadow:0 1px 0 var(--success-dark);}
+  .search-actions .btn-search-cancel{background:var(--danger);box-shadow:0 3px 0 var(--danger-dark);}
+  .search-actions .btn-search-cancel:active{transform:translateY(2px);box-shadow:0 1px 0 var(--danger-dark);}
+  .search-results{
+    flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:12px 14px calc(14px + env(safe-area-inset-bottom));
+  }
+  .search-card{cursor:pointer;transition:transform .07s;}
+  .search-card:active{transform:scale(.99);}
+</style>
+</head>
+<body>
+  <div class="appbar">
+    <div class="actionbar">
+      <button class="action-btn btn-raz" id="btnRaz">R.A.Z.</button>
+      <button class="action-btn btn-envoyer" id="btnEnvoyer">Envoyer</button>
+    </div>
+    <div class="appbar-right">
+      <button class="gear-btn" id="btnSound" aria-label="Couper/remettre le son">
+        <svg class="icon-sound" id="iconSoundOn" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+          <path d="M18.5 5.5a9 9 0 0 1 0 13"></path>
+        </svg>
+        <svg class="icon-sound" id="iconSoundOff" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <line x1="16" y1="9" x2="22" y2="15"></line>
+          <line x1="22" y1="9" x2="16" y2="15"></line>
+        </svg>
+      </button>
+      <button class="gear-btn" id="btnSettings">⚙</button>
+    </div>
+  </div>
+
+  <div class="inv-banner" id="invBanner">
+    <div class="inv-row1">
+      <input type="checkbox" id="chkInventaire">
+      <label for="chkInventaire">Mode inventaire</label>
+      <button class="inv-toggle" id="invToggle" aria-label="Réduire/agrandir">▾</button>
+    </div>
+    <div class="inv-details">
+      <div class="inv-row2">
+        <input type="checkbox" id="chkMagOnly" checked>
+        <label for="chkMagOnly">Afficher ce magasin uniquement</label>
+      </div>
+      <div class="inv-field">
+        <label>Magasin :</label>
+        <select id="selMagasin"></select>
+      </div>
+      <div class="inv-field">
+        <label>Emplacement :</label>
+        <select id="selEmplacement"></select>
+      </div>
+      <div class="inv-counter" id="invCounter">Titres inventoriés : 0/0</div>
+    </div>
+  </div>
+
+  <div class="table-scroll" id="tableScroll">
+    <div class="empty-state" id="emptyState">Aucune ligne scannée pour l'instant.<br>Appuyez sur SCAN pour commencer.</div>
+  </div>
+
+  <div class="scan-zone">
+    <input id="scannerCapture" type="text" inputmode="none" autocomplete="off" autocorrect="off"
+           autocapitalize="off" spellcheck="false" placeholder="Scanner un article (douchette)…"
+           style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:10px 12px;border-radius:10px;border:1px solid var(--line,#ccc);font-size:15px;">
+    <div class="scan-buttons">
+      <button id="btnSearch" aria-label="Rechercher un article">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+        </svg>
+      </button>
+      <button id="btnScan">◉ SCAN</button>
+    </div>
+  </div>
+
+  <div class="cam-modal" id="camModal">
+    <button class="cam-close" id="btnCamClose">✕</button>
+    <div id="camReader"></div>
+    <div class="cam-hint">Visez le code-barres EAN13 de l'article</div>
+  </div>
+
+  <!-- Modal de recherche plein écran -->
+  <div class="search-modal" id="searchModal">
+    <div class="search-header">
+      <div class="search-input-wrap">
+        <input type="text" id="searchInput" placeholder="Rechercher un article, EAN, magasin…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
+        <button class="search-close" id="searchClose" aria-label="Fermer">✕</button>
+      </div>
+      <div class="search-actions">
+        <button class="btn-search-ok" id="searchOk">OK</button>
+        <button class="btn-search-cancel" id="searchCancel">Annuler</button>
+      </div>
+    </div>
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <div class="modal-back" id="confirmModal">
+    <div class="modal">
+      <h3 id="confirmTitle" style="margin-top:0;"></h3>
+      <p id="confirmText"></p>
+      <div class="actions">
+        <button class="btn-cancel" id="confirmCancel">Annuler</button>
+        <button class="btn-confirm" id="confirmOk">Confirmer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="settingsModal">
+    <div class="modal">
+      <h3 style="margin-top:0;">Connexion GitHub</h3>
+      <p>Jeton d'accès personnel (scope <code>gist</code>), nécessaire pour envoyer les modifications.</p>
+      <!-- Formulaire isolé + attributs anti-autofill : sans cela, les
+           navigateurs (Chrome/Android en particulier) associent le champ
+           texte visible précédent (la recherche) comme "identifiant" du
+           champ password, et peuvent mélanger/réinjecter les deux valeurs. -->
+      <form autocomplete="off" onsubmit="return false;">
+        <input type="text" name="prevent_autofill_username" autocomplete="off" tabindex="-1" aria-hidden="true"
+               style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+        <input type="password" id="inputToken" name="gh-pat-field" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+               autocomplete="new-password" data-lpignore="true" data-1p-ignore data-bwignore data-form-type="other">
+      </form>
+      <div class="actions">
+        <button class="btn-cancel" id="btnClearToken" style="margin-right:auto;">Effacer</button>
+        <button class="btn-cancel" id="btnCloseSettings">Fermer</button>
+        <button class="btn-confirm ok" id="btnSaveToken">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ======================================================================
+   CONFIGURATION
+   ====================================================================== */
+const GIST_DATA_ID  = 'b9a88af354ce71fc0f6bdb304203c650';   // retours.json
+const GIST_MODIF_ID = '34b4d14fff9969bd8c730b70d819168b';   // retours-modifications.json
+const LS_TOKEN     = 'retours_gh_token';
+const LS_FN_DATA   = 'retours_gist_data_filename';
+const LS_FN_MOD    = 'retours_gist_modif_filename';
+const LS_LOCAL_MOD = 'retours_local_modifications';
+const LS_DATA_CACHE= 'retours_local_data_cache';
+const DEFAULT_DEV_TOKEN = 'ghp_mMLFagHfmwUu4JWxM3yYHRqKhsulsb39QhUr'; // jeton de développement, à remplacer avant mise en production
+if(!localStorage.getItem(LS_TOKEN)) localStorage.setItem(LS_TOKEN, DEFAULT_DEV_TOKEN);
+
+let dataTable = [];
+
+// Optimisations recherche : index construit une seule fois après le chargement.
+const SEARCH_MIN_CHARS = 2;
+const SEARCH_MAX_RESULTS = 100;
+const SEARCH_DEBOUNCE_MS = 180;
+let searchTimer = null;
+let searchIndex = [];
+let indexByEan = new Map();
+
+function buildDataIndexes(){
+  searchIndex = dataTable.map(row => ({
+    row,
+    text: [
+      row.article, row.ean13, row.titre, row.magasin, row.emplace, row.stock
+    ].map(v => String(v ?? '').toLowerCase()).join(' ')
+  }));
+
+  indexByEan = new Map();
+  for(const row of dataTable){
+    const ean = String(row.ean13 ?? '');
+    if(!ean) continue;
+    const list = indexByEan.get(ean);
+    if(list) list.push(row);
+    else indexByEan.set(ean, [row]);
+  }
+}        // référentiel article (lecture seule, depuis retours.json)
+let modifications = [];    // table de travail locale (source de vérité tant que non envoyée)
+let invMode = false;
+
+/* ======================================================================
+   UTILITAIRES
+   ====================================================================== */
+function toast(msg, kind){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (kind ? ' '+kind : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.className='', 3000);
+}
+function safeParseArray(content){
+  if(!content) return [];
+  let parsed;
+  try{ parsed = JSON.parse(content); }
+  catch(e){ return []; }
+  if(Array.isArray(parsed)) return parsed;
+  if(parsed && typeof parsed === 'object') return Object.values(parsed);
+  return [];
+}
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function saveLocalModifications(){
+  localStorage.setItem(LS_LOCAL_MOD, JSON.stringify(modifications));
+}
+function loadLocalModifications(){
+  modifications = safeParseArray(localStorage.getItem(LS_LOCAL_MOD));
+}
+function askConfirm(title, text, opts={}){
+  return new Promise(resolve=>{
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmText').textContent = text;
+    const modal = document.getElementById('confirmModal');
+    const okBtn = document.getElementById('confirmOk');
+    const cancelBtn = document.getElementById('confirmCancel');
+    cancelBtn.style.display = opts.alertOnly ? 'none' : '';
+    okBtn.textContent = opts.alertOnly ? 'OK' : 'Confirmer';
+    modal.classList.add('show');
+    const cleanup = (val)=>{
+      modal.classList.remove('show');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(val);
+    };
+    const onOk = ()=>cleanup(true);
+    const onCancel = ()=>cleanup(false);
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+function showAlert(title, text){ return askConfirm(title, text, {alertOnly:true}); }
+
+/* ---------- Retour sonore ---------- */
+let soundEnabled = localStorage.getItem('retours_sound') !== 'off';
+function updateSoundIcon(){
+  document.getElementById('iconSoundOn').style.display  = soundEnabled ? '' : 'none';
+  document.getElementById('iconSoundOff').style.display = soundEnabled ? 'none' : '';
+}
+function beep(freq, duration, type){
+  if(!soundEnabled) return;
+  try{
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration/1000);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration/1000);
+    osc.onended = ()=> ctx.close();
+  }catch(e){ /* audio indisponible, on ignore silencieusement */ }
+}
+function beepSuccess(){ beep(1568, 110, 'sine'); }
+function beepUnknown(){ beep(280, 260, 'square'); }
+
+/* ======================================================================
+   API GITHUB GIST
+   ====================================================================== */
+function ghHeaders(needAuth){
+  const h = {'Accept':'application/vnd.github+json'};
+  const token = localStorage.getItem(LS_TOKEN);
+  if(needAuth && token) h['Authorization'] = 'token '+token;
+  return h;
+}
+async function ghReadFirstFile(gistId){
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {headers: ghHeaders(false)});
+  if(!res.ok) throw new Error('Lecture GIST impossible ('+res.status+')');
+  const gist = await res.json();
+  const filenames = Object.keys(gist.files || {});
+  if(filenames.length === 0) throw new Error('GIST vide');
+  const filename = filenames[0];
+  let content = gist.files[filename].content;
+  if(gist.files[filename].truncated){
+    const raw = await fetch(gist.files[filename].raw_url);
+    content = await raw.text();
+  }
+  return {filename, content};
+}
+async function ghPatchFile(gistId, filename, content){
+  const token = localStorage.getItem(LS_TOKEN);
+  if(!token) throw new Error('Aucun jeton GitHub enregistré (⚙)');
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+    method:'PATCH',
+    headers:{...ghHeaders(true),'Content-Type':'application/json'},
+    body: JSON.stringify({files:{[filename]:{content}}})
+  });
+  if(!res.ok){
+    const body = await res.text();
+    throw new Error('Échec ('+res.status+') '+body.slice(0,140));
+  }
+  return res.json();
+}
+
+/* ======================================================================
+   CHARGEMENT REFERENTIEL ARTICLE
+   ====================================================================== */
+async function loadDataTable(){
+  try{
+    const {filename, content} = await ghReadFirstFile(GIST_DATA_ID);
+    localStorage.setItem(LS_FN_DATA, filename);
+    dataTable = safeParseArray(content);
+    buildDataIndexes();
+    localStorage.setItem(LS_DATA_CACHE, JSON.stringify(dataTable));
+    toast('Référentiel article synchronisé ('+dataTable.length+' lignes)','ok');
+  }catch(e){
+    dataTable = safeParseArray(localStorage.getItem(LS_DATA_CACHE));
+    toast('Hors-ligne : référentiel local utilisé ('+dataTable.length+' lignes)','err');
+  }
+  populateInventaireSelects();
+  updateInventaireCounter();
+}
+
+/* ======================================================================
+   MODE INVENTAIRE
+   ====================================================================== */
+function populateInventaireSelects(){
+  const magasins = [...new Set(dataTable.map(r=>r.magasin))].filter(Boolean).sort();
+  const selM = document.getElementById('selMagasin');
+  const prevM = selM.value;
+  selM.innerHTML = magasins.map(m=>`<option value="${m}">${m}</option>`).join('');
+  if(magasins.includes(prevM)) selM.value = prevM;
+  updateEmplacementOptions();
+}
+function updateEmplacementOptions(){
+  const selM = document.getElementById('selMagasin');
+  const selE = document.getElementById('selEmplacement');
+  const prevE = selE.value;
+  const emplacements = [...new Set(dataTable.filter(r=>r.magasin===selM.value).map(r=>r.emplace ?? ''))].sort((a,b)=>a.localeCompare(b,'fr',{numeric:true}));
+  selE.innerHTML = emplacements.map(e=>`<option value="${e}">${e === '' ? '--Vide--' : e}</option>`).join('');
+  if(emplacements.includes(prevE)) selE.value = prevE;
+}
+document.getElementById('selMagasin').addEventListener('change', ()=>{ updateEmplacementOptions(); updateInventaireCounter(); renderTable(); });
+document.getElementById('selEmplacement').addEventListener('change', ()=>{ updateInventaireCounter(); renderTable(); });
+
+document.getElementById('chkInventaire').addEventListener('change', (e)=>{
+  invMode = e.target.checked;
+  document.getElementById('invBanner').classList.toggle('expanded', invMode);
+  updateInventaireCounter();
+  renderTable();
+});
+
+document.getElementById('invToggle').addEventListener('click', ()=>{
+  document.getElementById('invBanner').classList.toggle('collapsed');
+});
+
+document.getElementById('chkMagOnly').addEventListener('change', ()=>{ renderTable(); });
+
+document.getElementById('btnSound').addEventListener('click', ()=>{
+  soundEnabled = !soundEnabled;
+  localStorage.setItem('retours_sound', soundEnabled ? 'on' : 'off');
+  updateSoundIcon();
+  if(soundEnabled) beepSuccess();
+  toast(soundEnabled ? 'Son activé' : 'Son coupé');
+});
+
+function updateInventaireCounter(){
+  if(!invMode) return;
+  const m = document.getElementById('selMagasin').value;
+  const e = document.getElementById('selEmplacement').value;
+  const total = dataTable.filter(r=>r.magasin===m && r.emplace===e).length;
+  const x = modifications.filter(r=>r.magasin===m && r.emplacement===e).length;
+  document.getElementById('invCounter').textContent = `Titres inventoriés : ${x}/${total}`;
+}
+
+/* ======================================================================
+   TABLE DE TRAVAIL (MODIFICATIONS)
+   ====================================================================== */
+let flashIndex = null; // index (dans modifications) à mettre en évidence au prochain rendu
+
+function renderTable(){
+  const scroll = document.getElementById('tableScroll');
+  scroll.innerHTML = '';
+  if(modifications.length===0){
+    scroll.innerHTML = '<div class="empty-state" id="emptyState">Aucune ligne scannée pour l\'instant.<br>Appuyez sur SCAN pour commencer.</div>';
+    return;
+  }
+  const selM = document.getElementById('selMagasin').value;
+  const selE = document.getElementById('selEmplacement').value;
+  const magOnly = invMode && document.getElementById('chkMagOnly').checked;
+
+  // affichage du plus récent en haut
+  for(let i = modifications.length - 1; i >= 0; i--){
+    const r = modifications[i];
+    if(magOnly && r.magasin !== selM) continue; // masque les autres magasins
+    const card = document.createElement('div');
+    card.className = 'rowcard';
+    if(invMode){
+      card.classList.add(r.magasin===selM && r.emplacement===selE ? 'inv-match' : 'inv-mismatch');
+    }
+    card.dataset.index = i;
+
+    const empModified = r.nouvelEmplacement !== '' && r.nouvelEmplacement !== r.emplacement;
+    const empValue = empModified ? r.nouvelEmplacement : r.emplacement;
+    const empDisplay = empValue === '' ? '--Vide--' : empValue;
+
+    const stockEqual = r.nouveauStock === '' || Number(r.nouveauStock) === Number(r.stock);
+    const stockDisplay = stockEqual ? String(r.stock) : `${r.nouveauStock}/${r.stock}`;
+
+    card.innerHTML = `
+      <div class="rc-titre" data-role="titre">${r.titre || '(sans titre)'}</div>
+      <div class="rc-meta">
+        <span>Art. ${r.article}</span>
+        <span>EAN ${r.ean13}</span>
+        <span>Mag. ${r.magasin}</span>
+      </div>
+      <div class="rc-editfields">
+        <div class="ef">
+          <span class="ef-value ${empModified?'modified':''}" data-field="emplacement">${empDisplay}</span>
+        </div>
+        <div class="ef">
+          <span class="ef-value ${stockEqual?'':'modified'}" data-field="stock">${stockDisplay}</span>
+        </div>
+      </div>
+    `;
+    scroll.appendChild(card);
+  }
+
+  // double-clic / double-tap sur le titre = suppression
+  scroll.querySelectorAll('[data-role="titre"]').forEach(el=>{
+    bindDoubleActivate(el, ()=> confirmDeleteRow(Number(el.closest('.rowcard').dataset.index)));
+  });
+
+  // double-clic / double-tap sur un champ = édition (clic simple = aucune action, pour éviter le clavier intempestif)
+  scroll.querySelectorAll('.ef-value').forEach(el=>{
+    bindDoubleActivate(el, ()=> startFieldEdit(el));
+  });
+
+  // mise en évidence + défilement vers la ligne concernée par un re-scan
+  if(flashIndex !== null){
+    const card = scroll.querySelector(`.rowcard[data-index="${flashIndex}"]`);
+    if(card){
+      card.scrollIntoView({behavior:'smooth', block:'center'});
+      card.classList.add('flash');
+      setTimeout(()=> card.classList.remove('flash'), 1400);
+    }
+    flashIndex = null;
+  }
+}
+
+let isEditingField = false;
+function startFieldEdit(spanEl){
+  const card = spanEl.closest('.rowcard');
+  const idx = Number(card.dataset.index);
+  const row = modifications[idx];
+  const field = spanEl.dataset.field;
+  const currentValue = field === 'emplacement'
+    ? (row.nouvelEmplacement !== '' ? row.nouvelEmplacement : row.emplacement)
+    : (row.nouveauStock !== '' ? row.nouveauStock : row.stock);
+
+  isEditingField = true;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentValue;
+  if(field === 'stock') input.inputMode = 'numeric';
+  spanEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const commit = ()=>{
+    const val = input.value.trim();
+    if(field === 'emplacement'){
+      row.nouvelEmplacement = (val !== row.emplacement) ? val : '';
+    } else {
+      row.nouveauStock = (val !== '' && Number(val) !== Number(row.stock)) ? val : '';
+    }
+    saveLocalModifications();
+    isEditingField = false;
+    updateInventaireCounter();
+    renderTable();
+    // On force le focus immédiat sur le champ de capture pour que la douchette
+    // redevienne active tout de suite (force=true contourne le délai anti-rebond).
+    refocusScanCapture(true);
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter'){ input.blur(); }
+  });
+}
+
+async function confirmDeleteRow(idx){
+  const row = modifications[idx];
+  const ok = await askConfirm('Supprimer la ligne ?', `Article ${row.article} — ${row.titre}`);
+  if(ok){
+    modifications.splice(idx,1);
+    saveLocalModifications();
+    updateInventaireCounter();
+    renderTable();
+  }
+}
+
+/* ======================================================================
+   R.A.Z. / ENVOYER
+   ====================================================================== */
+document.getElementById('btnRaz').addEventListener('click', async ()=>{
+  if(modifications.length===0){ toast('La liste est déjà vide'); return; }
+  const ok = await askConfirm('Remise à zéro', 'Toutes les lignes scannées localement seront supprimées. Cette action est irréversible.');
+  if(ok){
+    modifications = [];
+    saveLocalModifications();
+    updateInventaireCounter();
+    renderTable();
+    toast('Liste locale remise à zéro','ok');
+  }
+});
+
+document.getElementById('btnEnvoyer').addEventListener('click', async ()=>{
+  if(modifications.length===0){ toast('Rien à envoyer'); return; }
+  const ok = await askConfirm('Envoyer vers le GIST', `${modifications.length} ligne(s) vont être envoyées vers « retours-modifications.json ».`);
+  if(!ok) return;
+  try{
+    toast('Envoi en cours…');
+    let filename = localStorage.getItem(LS_FN_MOD);
+    let remote = [];
+    try{
+      const first = await ghReadFirstFile(GIST_MODIF_ID);
+      filename = first.filename;
+      remote = safeParseArray(first.content);
+    }catch(e){ /* le fichier distant sera créé/écrasé avec les données locales */ }
+    const keyOf = r => `${r.article}||${r.magasin}||${r.emplacement}||${r.ean13}||${r.nouvelEmplacement}||${r.nouveauStock}`;
+    const map = new Map(remote.map(r=>[keyOf(r), r]));
+    for(const r of modifications) map.set(keyOf(r), r);
+    const merged = Array.from(map.values());
+    await ghPatchFile(GIST_MODIF_ID, filename || 'retours-modifications.json', JSON.stringify(merged));
+    modifications = [];
+    saveLocalModifications();
+    updateInventaireCounter();
+    renderTable();
+    toast('Envoi réussi ('+merged.length+' lignes au total)','ok');
+  }catch(e){
+    toast(e.message,'err');
+  }
+});
+
+/* ======================================================================
+   TRAITEMENT D'UN SCAN
+   ====================================================================== */
+function compareMagasins(a, b){
+  const sa = String(a ?? '');
+  const sb = String(b ?? '');
+  const na = Number(sa);
+  const nb = Number(sb);
+  if(Number.isFinite(na) && Number.isFinite(nb) && sa !== '' && sb !== '') return na - nb;
+  return sa.localeCompare(sb, 'fr', {numeric:true, sensitivity:'base'});
+}
+
+function onScanValue(ean){
+  ean = String(ean).replace(/\D/g,'');
+  if(ean.length < 8){ return; }
+
+  if(html5QrCode) stopCamera();
+
+  const candidates = indexByEan.get(ean) || [];
+  if(candidates.length === 0){
+    beepUnknown();
+    if(navigator.vibrate) navigator.vibrate([30,60,30]);
+    showAlert('Code non reconnu', `${ean} n'est pas dans la liste`);
+    return;
+  }
+
+  // Si plusieurs magasins existent pour le même EAN, le magasin de valeur
+  // la plus élevée devient la ligne cible pour ce scan et pour les suivants.
+  let targetCandidate;
+  if(invMode){
+    const m = document.getElementById('selMagasin').value;
+    const e = document.getElementById('selEmplacement').value;
+    targetCandidate = candidates.find(r => r.magasin===m && r.emplace===e);
+    if(!targetCandidate){
+      // En mode inventaire, un titre existant mais absent de la position
+      // définie dans le magasin défini est signalé comme un code inconnu.
+      beepUnknown();
+      if(navigator.vibrate) navigator.vibrate([30,60,30]);
+      showAlert('Position non définie', `${ean} n'existe pas à l'emplacement sélectionné dans ce magasin.`);
+      return;
+    }
+  }
+  if(!targetCandidate){
+    targetCandidate = candidates.reduce((highest, candidate) =>
+      !highest || compareMagasins(candidate.magasin, highest.magasin) > 0 ? candidate : highest, null);
+  }
+
+  // Crée une ligne pour chaque magasin/emplacement du référentiel, une seule fois.
+  const uniqueCandidates = [];
+  const seen = new Set();
+  for(const candidate of candidates){
+    const key = `${candidate.article}||${candidate.magasin}||${candidate.emplace ?? ''}`;
+    if(!seen.has(key)){ seen.add(key); uniqueCandidates.push(candidate); }
+  }
+
+  let targetWasCreated = false;
+  for(const candidate of uniqueCandidates){
+    const existingIdx = modifications.findIndex(r =>
+      r.article===candidate.article && r.magasin===candidate.magasin && r.emplacement===candidate.emplace);
+    if(existingIdx === -1){
+      modifications.push({
+        article:candidate.article, ean13:candidate.ean13, titre:candidate.titre,
+        magasin:candidate.magasin, emplacement:candidate.emplace, stock:candidate.stock,
+        nouvelEmplacement:'', nouveauStock: candidate===targetCandidate ? '1' : ''
+      });
+      if(candidate===targetCandidate) targetWasCreated = true;
+    }
+  }
+
+  // Retrouve systématiquement la ligne du magasin cible : toutes les
+  // incrémentations ultérieures de cet EAN reviendront ici.
+  const targetIdx = modifications.findIndex(r =>
+    r.article===targetCandidate.article &&
+    r.magasin===targetCandidate.magasin &&
+    r.emplacement===targetCandidate.emplace);
+
+  if(targetIdx !== -1){
+    const row = modifications[targetIdx];
+    if(!targetWasCreated){
+      const currentCount = row.nouveauStock !== '' ? Number(row.nouveauStock) : Number(row.stock);
+      row.nouveauStock = String((isNaN(currentCount) ? 0 : currentCount) + 1);
+    }
+    flashIndex = targetIdx;
+  }
+
+  saveLocalModifications();
+  updateInventaireCounter();
+  renderTable();
+  beepSuccess();
+  if(navigator.vibrate) navigator.vibrate(40);
+}
+
+/* ---------- Capture clavier (douchette Zebra) ----------
+   IMPORTANT : la douchette (mode clavier / DataWedge) n'envoie ses frappes
+   qu'à l'élément qui a effectivement le focus, et sur Android 10+ DataWedge
+   affiche/masque son propre clavier pendant l'envoi des touches (comportement
+   documenté par Zebra) : un champ *caché* s'est révélé peu fiable pour
+   recevoir ces frappes. #scannerCapture est donc un champ visible, en haut de
+   la zone de scan, qu'on garde focus en permanence sur l'écran principal — le
+   même principe que le champ de recherche, dont on sait qu'il capte bien la
+   douchette. On lit sa valeur au fil de la frappe (voir plus bas) plutôt que
+   d'intercepter les touches au niveau du document. */
+const scannerCaptureEl = document.getElementById('scannerCapture');
+
+let lastTouchTime = 0;
+
+function refocusScanCapture(force){
+  if(isEditingField) return;
+  // Jamais de vol de focus tant qu'une fenêtre modale est ouverte
+  for(const id of ['settingsModal','searchModal','camModal','confirmModal']){
+    if(document.getElementById(id).classList.contains('show')) return;
+  }
+  // Ne pas voler le focus d'un champ ou d'un bouton déjà focalisé
+  const ae = document.activeElement;
+  if(ae && ae !== document.body && ae !== scannerCaptureEl
+     && ['INPUT','TEXTAREA','SELECT','BUTTON'].includes(ae.tagName)) return;
+  // Ne pas reprendre le focus juste après un tap tactile : sur le TC52 ce
+  // "rebond" de focus empêchait le clic de se terminer correctement.
+  if(!force && Date.now() - lastTouchTime < 500) return;
+  try{ scannerCaptureEl.focus({preventScroll:true}); }catch(e){}
+}
+scannerCaptureEl.addEventListener('blur', ()=> setTimeout(refocusScanCapture, 30));
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) refocusScanCapture(); });
+window.addEventListener('focus', refocusScanCapture);
+refocusScanCapture();
+
+// CORRECTION : on ne bloque PLUS les interactions. L'ancien guardFocus appelait
+// preventDefault() sur tous les mousedown hors champs de saisie, ce qui rendait
+// inopérants les boutons (R.A.Z., Envoyer, ⚙, SCAN, OK/Annuler), la case
+// "Mode inventaire" et les cartes de recherche. On se contente de mémoriser
+// les taps tactiles pour que refocusScanCapture() ne reprenne pas le focus
+// dans les 500 ms qui suivent un tap.
+document.addEventListener('touchstart', ()=>{ lastTouchTime = Date.now(); }, {passive:true});
+
+/* Double activation : dblclick (souris) ou double-tap (tactile). Le simple
+   tap reste sans action pour éviter d'ouvrir le clavier par accident pendant
+   les scans. */
+function bindDoubleActivate(el, handler){
+  el.addEventListener('dblclick', handler);
+  let lastTap = 0, startX = 0, startY = 0;
+  el.addEventListener('touchstart', (e)=>{
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+  }, {passive:true});
+  el.addEventListener('touchend', (e)=>{
+    const t = e.changedTouches[0];
+    // Un geste de scroll/drag ne compte pas comme un tap
+    if(Math.hypot(t.clientX - startX, t.clientY - startY) > 12){ lastTap = 0; return; }
+    const now = Date.now();
+    if(now - lastTap < 350){
+      e.preventDefault(); // évite la synthèse de clic après le second tap
+      lastTap = 0;
+      handler(e);
+    } else {
+      lastTap = now;
+    }
+  });
+}
+
+let scanDebounce = null;
+function processScanCaptureValue(){
+  if(scanDebounce){ clearTimeout(scanDebounce); scanDebounce = null; }
+  const val = scannerCaptureEl.value.replace(/\s+/g,'').trim();
+  scannerCaptureEl.value = '';
+  if(val.length >= 6){ onScanValue(val); } // longueur mini plausible d'un code-barres
+}
+scannerCaptureEl.addEventListener('input', ()=>{
+  const digitsOnly = scannerCaptureEl.value.replace(/\D/g,'');
+  if(scanDebounce) clearTimeout(scanDebounce);
+  if(digitsOnly.length >= 13){
+    // EAN-13 complet : on traite immédiatement, pas besoin d'attendre une pause.
+    scannerCaptureEl.value = '';
+    onScanValue(digitsOnly.slice(0,13));
+    return;
+  }
+  // Codes plus courts (EAN-8, UPC-A…) ou fin de frappe sans caractère de fin
+  // explicite : on attend une courte pause dans la frappe avant de traiter.
+  scanDebounce = setTimeout(processScanCaptureValue, 300);
+});
+scannerCaptureEl.addEventListener('keydown', (e)=>{
+  // Si la douchette envoie une touche de fin (Tab/Entrée), on traite tout de
+  // suite au lieu d'attendre le timeout.
+  if(e.key === 'Enter' || e.key === 'Tab'){
+    e.preventDefault();
+    processScanCaptureValue();
+  }
+});
+
+
+/* ---------- Caméra (iPhone et terminaux avec appareil photo) ---------- */
+let html5QrCode = null;
+async function startCamera(){
+  const camModal = document.getElementById('camModal');
+  camModal.classList.add('show');
+  html5QrCode = new Html5Qrcode('camReader', { formatsToSupport: [ Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.CODE_128 ] });
+  try{
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 12, qrbox: { width: 260, height: 140 } },
+      (decodedText)=>{ onScanValue(decodedText); },
+      ()=>{}
+    );
+  }catch(e){
+    toast('Caméra indisponible : '+e.message,'err');
+    stopCamera();
+  }
+}
+async function stopCamera(){
+  document.getElementById('camModal').classList.remove('show');
+  const instance = html5QrCode;
+  html5QrCode = null;
+  if(instance){
+    try{ await instance.stop(); instance.clear(); }catch(e){}
+  }
+  refocusScanCapture();
+}
+document.getElementById('btnCamClose').addEventListener('click', stopCamera);
+
+function hasCamera(){
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+}
+
+// Le bouton SCAN ouvre systématiquement la caméra ; la douchette Zebra, elle,
+// reste écoutée en permanence via la capture clavier globale.
+document.getElementById('btnScan').addEventListener('click', ()=>{
+  if(hasCamera()) startCamera();
+  else toast('Aucune caméra détectée sur cet appareil : utilisez la douchette','err');
+});
+
+/* ======================================================================
+   RECHERCHE DANS LE RÉFÉRENTIEL ARTICLE (loupe)
+   ====================================================================== */
+function openSearchModal(){
+  document.getElementById('searchModal').classList.add('show');
+  const inp = document.getElementById('searchInput');
+  inp.value = '';
+  renderSearchResults('');
+  // Focus immédiat + relance après un tick (pour garantir l'ouverture du
+  // clavier logiciel sur iOS/Android).
+  try{ inp.focus(); }catch(e){}
+  setTimeout(()=>{ try{ inp.focus(); }catch(e){} }, 60);
+}
+
+function closeSearchModal(){
+  document.getElementById('searchModal').classList.remove('show');
+  try{ document.getElementById('searchInput').blur(); }catch(e){}
+  refocusScanCapture();
+}
+
+function renderSearchResults(query){
+  const container = document.getElementById('searchResults');
+  const q = String(query || '').trim().toLowerCase();
+
+  // Ne pas afficher les 8000 lignes à l'ouverture du mode recherche.
+  if(q.length < SEARCH_MIN_CHARS){
+    container.innerHTML = '<div class="empty-state">Saisissez au moins 2 caractères pour rechercher.</div>';
+    return;
+  }
+
+  const matches = [];
+  let hasMore = false;
+
+  // Les champs sont déjà normalisés dans searchIndex.
+  for(const item of searchIndex){
+    if(item.text.includes(q)){
+      if(matches.length < SEARCH_MAX_RESULTS) {
+        matches.push(item.row);
+      } else {
+        hasMore = true;
+        break;
+      }
+    }
+  }
+
+  if(matches.length === 0){
+    container.innerHTML = '<div class="empty-state">Aucun article ne correspond.</div>';
+    return;
+  }
+
+  const cards = matches.map(r => {
+    const empDisplay = (r.emplace === '' || r.emplace === undefined || r.emplace === null)
+      ? '--Vide--' : escapeHtml(r.emplace);
+    return `
+      <div class="rowcard inv-mismatch search-card" data-ean="${escapeHtml(r.ean13)}">
+        <div class="rc-titre">${escapeHtml(r.titre || '(sans titre)')}</div>
+        <div class="rc-meta">
+          <span>Art. ${escapeHtml(r.article)}</span>
+          <span>EAN ${escapeHtml(r.ean13)}</span>
+          <span>Mag. ${escapeHtml(r.magasin)}</span>
+        </div>
+        <div class="rc-editfields">
+          <div class="ef">
+            <span class="ef-value">${empDisplay}</span>
+          </div>
+          <div class="ef">
+            <span class="ef-value">${escapeHtml(r.stock)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = cards +
+    (hasMore
+      ? '<div class="empty-state">Plus de 100 résultats : affinez votre recherche.</div>'
+      : '');
+}
+
+document.getElementById('btnSearch').addEventListener('click', openSearchModal);
+document.getElementById('searchClose').addEventListener('click', closeSearchModal);
+document.getElementById('searchCancel').addEventListener('click', closeSearchModal);
+document.getElementById('searchInput').addEventListener('input', (e)=>{
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => renderSearchResults(e.target.value), SEARCH_DEBOUNCE_MS);
+});
+
+// Clic sur une carte : on récupère l'EAN et on le traite comme un scan.
+document.getElementById('searchResults').addEventListener('click', (e)=>{
+  const card = e.target.closest('.search-card');
+  if(!card) return;
+  const ean = card.dataset.ean;
+  closeSearchModal();
+  if(ean) onScanValue(ean);
+});
+
+// OK : on prend l'EAN de la carte en tête de liste affichée.
+document.getElementById('searchOk').addEventListener('click', ()=>{
+  const first = document.querySelector('#searchResults .search-card');
+  if(!first){ toast('Aucun article à sélectionner','err'); return; }
+  const ean = first.dataset.ean;
+  closeSearchModal();
+  if(ean) onScanValue(ean);
+});
+
+/* ======================================================================
+   PARAMETRES GITHUB
+   ====================================================================== */
+document.getElementById('btnSettings').addEventListener('click', ()=>{
+  document.getElementById('inputToken').value = localStorage.getItem(LS_TOKEN) || '';
+  document.getElementById('settingsModal').classList.add('show');
+});
+document.getElementById('btnCloseSettings').addEventListener('click', ()=>{
+  document.getElementById('settingsModal').classList.remove('show');
+  refocusScanCapture();
+});
+document.getElementById('btnClearToken').addEventListener('click', ()=>{
+  document.getElementById('inputToken').value = '';
+  localStorage.removeItem(LS_TOKEN);
+  toast('Jeton effacé','ok');
+});
+document.getElementById('btnSaveToken').addEventListener('click', ()=>{
+  const val = document.getElementById('inputToken').value.trim();
+  // Un jeton GitHub valide n'a jamais d'espace ni de saut de ligne : si on
+  // en trouve, c'est le signe d'un autofill/collage foireux (par ex. mélangé
+  // avec un texte de recherche). On bloque plutôt que d'enregistrer n'importe quoi.
+  if(/\s/.test(val)){
+    toast('Jeton invalide (contient un espace) : vérifiez qu\'il n\'a pas été mélangé avec autre chose','err');
+    return;
+  }
+  localStorage.setItem(LS_TOKEN, val);
+  document.getElementById('settingsModal').classList.remove('show');
+  toast('Jeton enregistré','ok');
+  refocusScanCapture();
+});
+
+/* ======================================================================
+   INITIALISATION
+   ====================================================================== */
+loadLocalModifications();
+renderTable();
+loadDataTable();
+updateSoundIcon();
+</script>
+</body>
+</html>
